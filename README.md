@@ -86,4 +86,36 @@ optional arguments:
   --test_out_file TEST_OUT_FILE
                         test summaries file
                         
-  ```                      
+  ```  
+  #### Features
+  
+  1. RNN/LSTM based sequence to sequence network
+  2. General utility/debugging features - tensorboard, model persistence
+  
+  
+  #### Modules
+  
+  * tldr_main.py - Entry point
+  * tldr_model.py - sequence 2 sequence model
+  * dataset_helper.py - helper module to parse CNN stories and create dataset
+  * model_params.py - contains all variables used in the model
+  * utils.py - common utility functions
+  * batch_helper.py - helper for batch processing
+  
+  #### Viewing Tensorboard logs
+  
+  ```
+  tensorboard --logdir=./logs
+  ```
+  
+  #### Folder Structure
+  ```
+  (tensorflow_p36plus) ubuntu@ip-172-31-16-7:~/dev$ tree -d tldr
+tldr
+├── data
+│   └── cnn
+│       └── stories
+├── logs
+├── models
+└── __pycache__
+```
