@@ -109,7 +109,7 @@ optional arguments:
   ```
   
   #### Folder Structure
-  
+  ```
   (tensorflow_p36plus) ubuntu@ip-172-31-16-7:~/dev$ tree -d tldr
 tldr
 ├── data
@@ -118,4 +118,4 @@ tldr
 ├── logs
 ├── models
 └── __pycache__
-
+```
