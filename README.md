@@ -3,6 +3,10 @@
 tldr is an experimental text summarizer that uses sequence to sequence neural machine learning models.
 
 ### To parse the CNN stories, generate vocab and dump into a pickle file for later dataset generation
+
+You can download CNN data from https://cs.nyu.edu/~kcho/DMQA/
+Note the below directory for the downloaded files directory = 'data/cnn/stories/'
+
 python tldr_main.py --parse_cnn_stories
 
 ### To regenerate dataset. This is required to be done once. Subsequent attempts load from a pickle file
