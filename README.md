@@ -107,6 +107,26 @@ optional arguments:
   * utils.py - common utility functions
   * batch_helper.py - helper for batch processing
   
+  ### Running ROUGE evaluation
+  
+  Files for ROUGE evaluation are stored in ./rouge
+  
+  There are two files - hypothesis.txt and reference.txt
+  
+  In order to obtain the use rouge, you will need to download the ROUGE package
+  
+  You can do this using the below command
+  
+  ```
+  sudo pip3 install rouge
+  ```
+  
+  Once you have downloaded this, you can compute the average ROUGE score using the below command. The output is a JSON file that has ROUGE metrics
+  
+  ```
+  rouge -a rouge/hypothesis.txt rouge/reference.txt
+  ```
+  
   #### Viewing Tensorboard logs
   
   ```
