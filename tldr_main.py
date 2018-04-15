@@ -44,7 +44,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate",type=float,default=0.001,help="learning rate")
 
     parser.add_argument("--model_dir",default="./models",help="path to saved models")
-    parser.add_argument("--restore_saved_model", action='store_true',help="restore saved model")
+    parser.add_argument("--ignore_checkpoint", action='store_true',help="ignore existing checkpoints for restore")
 
     parser.add_argument("--data_dir",default="./data",help="path to data")
 
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     print("max grad norm          :%d"    % args.max_grad_norm); params.max_grad_norm = args.max_grad_norm
     print("learning rate          :%0.4f" % args.learning_rate); params.learning_rate = args.learning_rate
     print("model directory        :%s"    % args.model_dir); params.model_dir = args.model_dir
-    print("restore model path     :%s"    % args.restore_saved_model); params.restore_saved_model = args.restore_saved_model
+    print("ignore checkpoints     :%s"    % args.ignore_checkpoint); params.ignore_checkpoint = args.ignore_checkpoint
     print("data directory         :%s"    % args.data_dir); params.data_dir = args.data_dir
     print("parse cnn stories      :%s"    % args.parse_cnn_stories); params.parse_cnn_stories = args.parse_cnn_stories
     print("regenerate dataset     :%s"    % args.regenerate_dataset); params.regenerate_dataset = args.regenerate_dataset

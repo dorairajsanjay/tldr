@@ -2,6 +2,6 @@
 *.in
 *.out
 /data
-/models
+/models*
 /logs
 /__pycache__

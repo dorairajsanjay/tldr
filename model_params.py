@@ -20,7 +20,7 @@ class ModelParams(object):
     max_grad_norm = 0
     learning_rate = 0
     model_dir = ""
-    restore_saved_model = False
+    ignore_checkpoint = False
     data_dir = ""
     generate_dataset = False
     regenerate_dataset = False
@@ -32,6 +32,8 @@ class ModelParams(object):
     test_out_file = ""
     dev_in_file = "dev.in"
     dev_out_file = "dev.out"
+    
+    save_model = True
     
     # special vocab tokens
     pad_token      = "<pad>"
@@ -74,6 +76,7 @@ class ModelParams(object):
     
     logs_path = './logs'
     ckpt_path = './models/model.ckpt'
+    ckpt_dir  = './models'
     
     # tensorflow variables
     train_loss = None

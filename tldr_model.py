@@ -16,6 +16,9 @@
 import tensorflow as tf
 import numpy as np
 import pickle
+import os
+import time
+import shutil
 
 import utils
 import batch_helper
@@ -213,12 +216,26 @@ def train_loop(params):
 
         # initialize global variables
         sess.run(tf.global_variables_initializer())
-
+            
+        # restore/backup from/to existing checkpoints
+        print("Checkpoint path:%s" % params.ckpt_path)
+            
         # restore model if exists
-        restore_option = input("Do you want to restore from checkpoint (y/n):")
-        if restore_option == "y":
+        if params.ignore_checkpoint != True:
             saver.restore(sess,params.ckpt_path)
             print("Session restored from checkpoint:",params.ckpt_path)
+        else:
+            print("ignore_checkpoint enabled. Not restoring from saved checkpoints")
+
+        # backup any existing models
+        backup_path = params.ckpt_dir + "_" + "-".join(time.ctime().split(" ")).replace(':','-')
+
+        if not os.path.exists(backup_path):
+            os.makedirs(backup_path)
+            print("Checkpoint backup path %s created" % backup_path)               
+
+        shutil.move(params.ckpt_dir,backup_path)
+        print("Backed up previous model in:",backup_path)
 
         # Create a summary to monitor cost tensor
         tf.summary.scalar("train_loss", params.train_loss)
@@ -319,7 +336,7 @@ def train_loop(params):
                         print("test_raw_enc_in_batch:\n",test_raw_enc_in_batch)
                         sample_id = 0
 
-                    print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
+                    #print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
                     print("\nTest. Story       :"," ".join(test_raw_enc_in_batch[sample_id][:
                                         params.max_display_len if len(test_raw_enc_in_batch[sample_id]) > params.max_display_len else len(test_raw_enc_in_batch[sample_id])]))
                     print("Test. Original Summary:", " ".join(test_raw_dec_in_batch[sample_id][:params.max_display_len if len(test_raw_dec_in_batch[sample_id])>params.max_display_len else len(test_raw_dec_in_batch[sample_id])]))  
@@ -341,9 +358,9 @@ def train_loop(params):
 
                     # Create checkpoint
 
-                    if save_model == True:
-                        print("Creating checkpoint in:",ckpt_path)
-                        saver.save(sess, ckpt_path)
+                    if params.save_model == True:
+                        print("Creating checkpoint in:",params.ckpt_path)
+                        saver.save(sess, params.ckpt_path)
 
                     print("-"*80)
 
