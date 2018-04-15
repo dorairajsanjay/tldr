@@ -23,6 +23,64 @@ import shutil
 import utils
 import batch_helper
 
+def display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds):
+    
+    # extract data from train and test batches for display
+    (raw_enc_in_batch,enc_in_batch,enc_in_batch_len,
+        raw_dec_in_batch,dec_in_batch,dec_in_batch_len,
+        raw_dec_out_batch,dec_out_batch,dec_out_batch_len) = train_batch
+        
+    (test_raw_enc_in_batch,test_enc_in_batch,test_enc_in_batch_len,
+        test_raw_dec_in_batch,test_dec_in_batch,test_dec_in_batch_len,
+        test_raw_dec_out_batch,test_dec_out_batch,test_dec_out_batch_len) = test_batch
+    
+    # length of output story and summary                    
+    sample_id = np.random.randint(0,params.batch_size)
+
+    # displaying training results
+    print("Epoch:%d,Completed Batches:%d, Loss:%0.4f" % (epoch_index,batches_count,loss_value))
+    print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len]))
+    print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len]))
+
+    #print("type(train_preds):%s,train_preds.shape:%s" % (type(train_preds),train_preds.shape))
+
+    train_preds = np.transpose(train_preds)
+    train_pred_ids = train_preds[sample_id]
+
+    #print("preds:\n",train_preds)
+    train_summary = [params.summary_dicts[1][x] for x in train_pred_ids]
+
+    print("Train. New  Summary:"," ".join(train_summary[:
+                        params.max_display_len if len(train_summary)<params.max_display_len else len(train_summary)])) 
+
+    # display testing results       
+    if len(test_raw_enc_in_batch) < sample_id:
+        print("len(test_raw_enc_in_batch) < sample_id...resetting sample_id to 0")
+        print("test_raw_enc_in_batch:\n",test_raw_enc_in_batch)
+        sample_id = 0
+
+    #print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
+    print("\nTest. Story       :"," ".join(test_raw_enc_in_batch[sample_id][:
+                        params.max_display_len if len(test_raw_enc_in_batch[sample_id]) > params.max_display_len else len(test_raw_enc_in_batch[sample_id])]))
+    print("Test. Original Summary:", " ".join(test_raw_dec_in_batch[sample_id][:params.max_display_len if len(test_raw_dec_in_batch[sample_id])>params.max_display_len else len(test_raw_dec_in_batch[sample_id])]))  
+
+    #print("type(test_preds):%s,len(test_preds):%d" % (type(test_preds),len(test_preds)))
+    #print("test_preds:\n",test_preds)
+
+    test_preds = test_preds[0]
+
+    #print("type(test_preds):%s,test_preds.shape:%s" % (type(test_preds),test_preds.shape))
+
+    test_preds = np.transpose(test_preds)
+    test_pred_ids = test_preds[sample_id]
+
+    #print("test_preds:\n",test_preds)
+    test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]                                                    
+    print("Test. New Summary:"," ".join(test_summary[:
+                params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)]))  
+
+    print("-"*80)   
+
 def initialize_data(params):
     
     params.final_vocab_size = params.vocab_size + 4
@@ -294,75 +352,18 @@ def train_loop(params):
                 # testing
                 test_preds = sess.run([params.test_predictions], feed_dict=feed_dict_test)
 
-                # display debug info and break
-                if debug == True:
-                    if total_batches == 5:
-                        break
-                    else:
-                        print("raw_enc_in_batch:%s,enc_in_batch:%s,type:%s\nenc_in_batch_len:%s,type:%s\n\
-                        raw_dec_in_batch:%s,dec_in_batch:%s,type:%s\ndec_in_batch_len:%s,type:%s\n\
-                        raw_dec_out_batch:%s,dec_out_batch:%s,type:%s\ndec_out_batch_len:%s,type:%s\n" \
-                              % (raw_enc_in_batch[0][:10],enc_in_batch.shape,type(enc_in_batch),enc_in_batch_len.shape,type(enc_in_batch_len),
-                                 raw_dec_in_batch[0][:10],dec_in_batch.shape,type(dec_in_batch),dec_in_batch_len.shape,type(dec_in_batch_len),
-                                 raw_dec_out_batch[0][:10],dec_out_batch.shape,type(dec_out_batch),dec_out_batch_len.shape,type(dec_out_batch_len)))
-
                 # increment batches_count and see if we need to display stats
                 batches_count += 1    
                 total_batches += 1
+                
+                # display stats and create checkpoint
                 if batches_count % params.batch_stats_display_count == 0:
-
-                    # length of output story and summary                    
-                    sample_id = np.random.randint(0,params.batch_size)
-
-                    # displaying training results
-                    print("Epoch:%d,Completed Batches:%d, Loss:%0.4f" % (epoch_index,batches_count,loss_value))
-                    print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len]))
-                    print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len]))
-
-                    #print("type(train_preds):%s,train_preds.shape:%s" % (type(train_preds),train_preds.shape))
-
-                    train_preds = np.transpose(train_preds)
-                    train_pred_ids = train_preds[sample_id]
-
-                    #print("preds:\n",train_preds)
-                    train_summary = [params.summary_dicts[1][x] for x in train_pred_ids]
-
-                    print("Train. New  Summary:"," ".join(train_summary[:
-                                        params.max_display_len if len(train_summary)<params.max_display_len else len(train_summary)])) 
-
-                    # display testing results       
-                    if len(test_raw_enc_in_batch) < sample_id:
-                        print("len(test_raw_enc_in_batch) < sample_id...resetting sample_id to 0")
-                        print("test_raw_enc_in_batch:\n",test_raw_enc_in_batch)
-                        sample_id = 0
-
-                    #print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
-                    print("\nTest. Story       :"," ".join(test_raw_enc_in_batch[sample_id][:
-                                        params.max_display_len if len(test_raw_enc_in_batch[sample_id]) > params.max_display_len else len(test_raw_enc_in_batch[sample_id])]))
-                    print("Test. Original Summary:", " ".join(test_raw_dec_in_batch[sample_id][:params.max_display_len if len(test_raw_dec_in_batch[sample_id])>params.max_display_len else len(test_raw_dec_in_batch[sample_id])]))  
-
-                    #print("type(test_preds):%s,len(test_preds):%d" % (type(test_preds),len(test_preds)))
-                    #print("test_preds:\n",test_preds)
-
-                    test_preds = test_preds[0]
-
-                    #print("type(test_preds):%s,test_preds.shape:%s" % (type(test_preds),test_preds.shape))
-
-                    test_preds = np.transpose(test_preds)
-                    test_pred_ids = test_preds[sample_id]
-
-                    #print("test_preds:\n",test_preds)
-                    test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]                                                    
-                    print("Test. New Summary:"," ".join(test_summary[:
-                                params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)]))  
-
+                    display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds)
+                    
                     # Create checkpoint
-
                     if params.save_model == True:
                         print("Creating checkpoint in:",params.ckpt_path)
                         saver.save(sess, params.ckpt_path)
-
-                    print("-"*80)
 
                 # update tensorboard summary
                 summary_writer.add_summary(summary,total_batches)
