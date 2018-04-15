@@ -3,6 +3,11 @@
 tldr is an experimental text summarizer that uses sequence to sequence neural machine learning models.
 
 ### To parse the CNN stories, generate vocab and dump into a pickle file for later dataset generation
+
+You can download CNN data from https://cs.nyu.edu/~kcho/DMQA/
+
+* Note the below directory for the downloaded files directory = 'data/cnn/stories/'
+
 python tldr_main.py --parse_cnn_stories
 
 ### To regenerate dataset. This is required to be done once. Subsequent attempts load from a pickle file
@@ -101,6 +106,26 @@ optional arguments:
   * model_params.py - contains all variables used in the model
   * utils.py - common utility functions
   * batch_helper.py - helper for batch processing
+  
+  ### Running ROUGE evaluation
+  
+  Files for ROUGE evaluation are stored in ./rouge
+  
+  There are two files - hypothesis.txt and reference.txt
+  
+  In order to obtain the use rouge, you will need to download the ROUGE package
+  
+  You can do this using the below command
+  
+  ```
+  sudo pip3 install rouge
+  ```
+  
+  Once you have downloaded this, you can compute the average ROUGE score using the below command. The output is a JSON file that has ROUGE metrics
+  
+  ```
+  rouge -a rouge/hypothesis.txt rouge/reference.txt
+  ```
   
   #### Viewing Tensorboard logs
   
