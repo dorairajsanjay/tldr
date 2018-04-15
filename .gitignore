@@ -1,0 +1,7 @@
+*.pkl
+*.in
+*.out
+/data
+/models
+/logs
+/__pycache__

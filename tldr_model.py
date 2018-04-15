@@ -1,0 +1,348 @@
+import tensorflow as tf
+import numpy as np
+import pickle
+
+import utils
+import batch_helper
+
+def initialize_data(params):
+    
+    params.final_vocab_size = params.vocab_size + 4
+    
+    story_vocab_file_path = params.data_dir + "/" + params.story_vocab_file
+    summary_vocab_file_path = params.data_dir + "/" + params.summary_vocab_file
+    
+    params.story_dicts = utils.getVocabDicts(params,story_vocab_file_path)
+    params.summary_dicts = utils.getVocabDicts(params,summary_vocab_file_path)
+    
+    if params.regenerate_dataset:
+        # recreate the train and test datasets
+        print("Recreating train and test datasets")
+        utils.create_train_and_test_datasets(params)
+    else:
+        # Restore dataset from pickle files
+        print("Restoring train and test datasets")
+        utils.restore_train_and_test_datasets(params)
+
+def create_model(params):
+
+    # create default graph
+    tf.reset_default_graph()
+
+    with tf.name_scope("Inputs"):
+
+        # shape of input is [max_time,batch_size] - time_major
+        params.encoder_inputs = tf.placeholder(tf.int32,[None,None],name="encoder_inputs")
+        params.decoder_inputs = tf.placeholder(tf.int32,[None,None],name="decoder_inputs")
+        params.decoder_targets = tf.placeholder(tf.int32,[None,None],name="decoder_targets")
+
+        params.source_sequence_length = tf.placeholder(tf.int32,shape=[params.batch_size])
+        params.target_sequence_length = tf.placeholder(tf.int32,shape=[params.batch_size])
+
+        params.tf_batch_size = tf.size(params.source_sequence_length)
+    
+    # Embedding
+    params.emb_init = tf.truncated_normal_initializer(mean=0.0, stddev=0.01)
+
+    # Encoder
+    with tf.variable_scope('encoder_lstm_cell'):
+
+        params.encoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="encoder_lstm_cell")
+
+        params.encoder_emb = tf.get_variable("embedding_encoder",[params.final_vocab_size, params.embedding_size], initializer=params.emb_init)
+
+        params.encoder_emb_inp = tf.nn.embedding_lookup(params.encoder_emb, params.encoder_inputs)
+
+        # initialize the initial hidden state
+        params.initial_hidden_state = params.encoder_cell.zero_state(params.tf_batch_size,dtype=tf.float32)
+
+        # Run Dynamic RNN
+        # encoder_outputs: [max_time,batch_size,hidden_units]
+        # encoder_state: [batch_size,hidden_units]
+        # sequence length is a vector of length batch_size
+        params.encoder_outputs, params.encoder_state = tf.nn.dynamic_rnn(
+                                                        params.encoder_cell,
+                                                        params.encoder_emb_inp,
+                                                        initial_state = params.initial_hidden_state,
+                                                        sequence_length=params.source_sequence_length,
+                                                        time_major=True
+                                                        )
+
+    ## Decoder Embedding matrix
+    with tf.variable_scope('decoder_embeddings'):
+            params.decoder_emb = tf.get_variable(
+                "embedding_decoder", [params.final_vocab_size, params.embedding_size],
+                initializer=params.emb_init)
+
+    # Build RNN Cell
+    with tf.variable_scope('train_decoder'):
+
+        # embedding lookup
+        params.decoder_emb_inp = tf.nn.embedding_lookup(params.decoder_emb, params.decoder_inputs)
+
+        # basic LSTM decoder cell
+        params.train_decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="train_decoder_lstm_cell")
+
+        # add projection layer
+        params.train_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.train_decoder_cell,params.final_vocab_size)
+
+        # Helper
+        params.train_helper = tf.contrib.seq2seq.TrainingHelper(
+                                        params.decoder_emb_inp,
+                                        params.target_sequence_length, 
+                                        time_major=True)
+
+        # Decoder
+        params.train_decoder = tf.contrib.seq2seq.BasicDecoder(
+                                cell = params.train_decoder_cell, 
+                                helper = params.train_helper, 
+                                initial_state = params.encoder_state)
+
+        # Dynamic decoding
+        params.train_output_states,params.train_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
+                                                                    params.train_decoder,
+                                                                    output_time_major = True)
+        # logits = [batch x seq_len x decoder_vocabulary_size]
+        params.train_logits = params.train_output_states.rnn_output
+
+        # predictions = [batch x seq_len]
+        params.train_predictions = tf.identity(params.train_output_states.sample_id)
+
+    ## Inference Decoder
+
+    with tf.variable_scope('test_decoder'):
+
+        # basic LSTM decoder cell
+        params.test_decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="test_decoder_lstm_cell")
+
+        # add projection layer
+        params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size)
+
+        params.start_tokens = tf.tile(tf.constant([params.sentence_start_index],  
+                                   dtype=tf.int32),  
+                                   [params.batch_size], 
+                                   name='start_tokens')
+
+        sentence_end_index = params.sentence_end_index # see vocab creation logic
+
+        params.test_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+                                                  params.decoder_emb,
+                                                  params.start_tokens,
+                                                  params.sentence_end_index)
+
+        # Decoder
+        params.test_decoder = tf.contrib.seq2seq.BasicDecoder(
+                                cell = params.test_decoder_cell, 
+                                helper = params.test_helper, 
+                                initial_state = params.encoder_state)
+
+        # Dynamic decoding
+        params.test_output_states,params.test_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
+                                                                    params.test_decoder,
+                                                                    maximum_iterations=params.max_summary_length,
+                                                                    output_time_major = True)
+        # logits = [batch x seq_len x decoder_vocabulary_size]
+        params.test_logits = params.test_output_states.rnn_output
+
+        # predictions = [batch x seq_len]
+        params.test_predictions = tf.identity(params.test_output_states.sample_id)
+
+
+    # Loss
+
+    #_target_sequence_length = [100]*128
+    params.weights = tf.sequence_mask(params.target_sequence_length, dtype=tf.float32)
+
+    params.sequence_loss = tf.contrib.seq2seq.sequence_loss(
+                                    params.train_logits,
+                                    params.decoder_targets,
+                                    params.weights,
+                                    average_across_timesteps=False,
+                                    average_across_batch=False)
+
+    params.train_loss = tf.reduce_mean(params.sequence_loss)
+
+
+    # Gradient computation and optimization
+    # gradient computation
+    tf_params = tf.trainable_variables()
+    gradients = tf.gradients(params.train_loss,tf_params)
+    clipped_gradients,_ = tf.clip_by_global_norm(gradients,params.max_grad_norm)
+
+    # optimizer
+    optimizer = tf.train.AdamOptimizer(params.learning_rate)
+
+    params.update_step = optimizer.apply_gradients(zip(clipped_gradients,tf_params))
+
+    
+def train_loop(params):
+
+    ## training and validation
+    debug = False
+
+    batch_stats_display_count = params.batch_stats_display_count
+    batches_count = 0
+    max_epochs = params.max_training_epochs
+    total_batches = 0
+    save_model = False
+    params.train_batch_index = 0
+    params.test_batch_index = 0
+
+    if tf.gfile.Exists(params.logs_path):
+       tf.gfile.DeleteRecursively(params.logs_path) 
+
+    # saver for checkpointing model
+    saver = tf.train.Saver(max_to_keep=4)
+
+    with tf.Session() as sess:
+
+        # initialize global variables
+        sess.run(tf.global_variables_initializer())
+
+        # restore model if exists
+        restore_option = input("Do you want to restore from checkpoint (y/n):")
+        if restore_option == "y":
+            saver.restore(sess,params.ckpt_path)
+            print("Session restored from checkpoint:",params.ckpt_path)
+
+        # Create a summary to monitor cost tensor
+        tf.summary.scalar("train_loss", params.train_loss)
+
+        # merge into a single op
+        merged_summary_op = tf.summary.merge_all()
+
+        # write logs to tensorboard
+        summary_writer = tf.summary.FileWriter(params.logs_path, graph=tf.get_default_graph())
+
+        # training loop
+        for epoch_index in range(1,max_epochs+1):
+
+            params.train_batch_index = 0
+            batches_count = 0
+
+            # Train
+            while True:
+
+                train_batch = batch_helper.getNextBatch(params,params.train_in_dataset,params.train_out_dataset)
+
+                if train_batch == None:
+                    break
+
+                (raw_enc_in_batch,enc_in_batch,enc_in_batch_len,
+                 raw_dec_in_batch,dec_in_batch,dec_in_batch_len,
+                 raw_dec_out_batch,dec_out_batch,dec_out_batch_len) = train_batch
+
+                # feed inputs
+                feed_dict_train = {
+                    params.encoder_inputs: enc_in_batch,
+                    params.decoder_inputs: dec_in_batch,
+                    params.decoder_targets:dec_out_batch,
+                    params.source_sequence_length: enc_in_batch_len,
+                    params.target_sequence_length: dec_out_batch_len
+                }
+
+                # training
+                _, loss_value, summary, train_preds = sess.run([params.update_step, params.train_loss, merged_summary_op,params.train_predictions], feed_dict=feed_dict_train)
+                
+                # focus on just the first batch for now
+                params.test_batch_index = 0
+                test_batch = batch_helper.getNextBatch(params,params.test_in_dataset,params.test_out_dataset,training=False)
+
+                (test_raw_enc_in_batch,test_enc_in_batch,test_enc_in_batch_len,
+                 test_raw_dec_in_batch,test_dec_in_batch,test_dec_in_batch_len,
+                 test_raw_dec_out_batch,test_dec_out_batch,test_dec_out_batch_len) = test_batch
+                
+                #print("Completed training...proceeding to test...")
+                # feed inputs
+                feed_dict_test = {
+                    params.encoder_inputs: test_enc_in_batch,
+                    params.source_sequence_length: test_enc_in_batch_len
+                }
+                
+                # testing
+                test_preds = sess.run([params.test_predictions], feed_dict=feed_dict_test)
+
+                # display debug info and break
+                if debug == True:
+                    if total_batches == 5:
+                        break
+                    else:
+                        print("raw_enc_in_batch:%s,enc_in_batch:%s,type:%s\nenc_in_batch_len:%s,type:%s\n\
+                        raw_dec_in_batch:%s,dec_in_batch:%s,type:%s\ndec_in_batch_len:%s,type:%s\n\
+                        raw_dec_out_batch:%s,dec_out_batch:%s,type:%s\ndec_out_batch_len:%s,type:%s\n" \
+                              % (raw_enc_in_batch[0][:10],enc_in_batch.shape,type(enc_in_batch),enc_in_batch_len.shape,type(enc_in_batch_len),
+                                 raw_dec_in_batch[0][:10],dec_in_batch.shape,type(dec_in_batch),dec_in_batch_len.shape,type(dec_in_batch_len),
+                                 raw_dec_out_batch[0][:10],dec_out_batch.shape,type(dec_out_batch),dec_out_batch_len.shape,type(dec_out_batch_len)))
+
+                # increment batches_count and see if we need to display stats
+                batches_count += 1    
+                total_batches += 1
+                if batches_count % params.batch_stats_display_count == 0:
+
+                    # length of output story and summary                    
+                    sample_id = np.random.randint(0,params.batch_size)
+
+                    # displaying training results
+                    print("Epoch:%d,Completed Batches:%d, Loss:%0.4f" % (epoch_index,batches_count,loss_value))
+                    print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len]))
+                    print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len]))
+
+                    #print("type(train_preds):%s,train_preds.shape:%s" % (type(train_preds),train_preds.shape))
+
+                    train_preds = np.transpose(train_preds)
+                    train_pred_ids = train_preds[sample_id]
+
+                    #print("preds:\n",train_preds)
+                    train_summary = [params.summary_dicts[1][x] for x in train_pred_ids]
+
+                    print("Train. New  Summary:"," ".join(train_summary[:
+                                        params.max_display_len if len(train_summary)<params.max_display_len else len(train_summary)])) 
+
+                    # display testing results       
+                    if len(test_raw_enc_in_batch) < sample_id:
+                        print("len(test_raw_enc_in_batch) < sample_id...resetting sample_id to 0")
+                        print("test_raw_enc_in_batch:\n",test_raw_enc_in_batch)
+                        sample_id = 0
+
+                    print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
+                    print("\nTest. Story       :"," ".join(test_raw_enc_in_batch[sample_id][:
+                                        params.max_display_len if len(test_raw_enc_in_batch[sample_id]) > params.max_display_len else len(test_raw_enc_in_batch[sample_id])]))
+                    print("Test. Original Summary:", " ".join(test_raw_dec_in_batch[sample_id][:params.max_display_len if len(test_raw_dec_in_batch[sample_id])>params.max_display_len else len(test_raw_dec_in_batch[sample_id])]))  
+
+                    #print("type(test_preds):%s,len(test_preds):%d" % (type(test_preds),len(test_preds)))
+                    #print("test_preds:\n",test_preds)
+
+                    test_preds = test_preds[0]
+
+                    #print("type(test_preds):%s,test_preds.shape:%s" % (type(test_preds),test_preds.shape))
+
+                    test_preds = np.transpose(test_preds)
+                    test_pred_ids = test_preds[sample_id]
+
+                    #print("test_preds:\n",test_preds)
+                    test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]                                                    
+                    print("Test. New Summary:"," ".join(test_summary[:
+                                params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)]))  
+
+                    # Create checkpoint
+
+                    if save_model == True:
+                        print("Creating checkpoint in:",ckpt_path)
+                        saver.save(sess, ckpt_path)
+
+                    print("-"*80)
+
+                # update tensorboard summary
+                summary_writer.add_summary(summary,total_batches)
+                
+def train(params):
+    
+    # load dataset 
+    initialize_data(params)
+    
+    # create the tensorflow graph
+    create_model(params)
+    
+    # run the training loop with intermediate validation
+    train_loop(params)
+    
