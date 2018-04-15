@@ -82,8 +82,12 @@ class ModelParams(object):
     batch_stats_display_count = 10
     
     logs_path = './logs'
+    
     ckpt_path = './models/model.ckpt'
     ckpt_dir  = './models'
+    
+    base_model_ckpt_path = './base_models/base_model.ckpt'
+    base_model_ckpt_dir  = './base_models'
     
     rouge_evaluation_dir = "./rouge"
     

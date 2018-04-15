@@ -304,13 +304,13 @@ def train_loop(params):
         sess.run(tf.global_variables_initializer())
             
         # restore/backup from/to existing checkpoints
-        print("Checkpoint path:%s" % params.ckpt_path)
+        print("Checkpoint path:%s" % params.base_model_ckpt_path)
             
         # restore model if exists
         if params.ignore_checkpoint != True:
             try:
-                saver.restore(sess,params.ckpt_path)
-                print("Session restored from checkpoint:",params.ckpt_path)
+                saver.restore(sess,params.base_model_ckpt_path)
+                print("Session restored from checkpoint:",params.base_model_ckpt_path)
             except Exception as exp: 
                 print("Unable to restore from checkpoint. No checkpoint files found")
                 pass
@@ -318,9 +318,9 @@ def train_loop(params):
             print("ignore_checkpoint enabled. Not restoring from saved checkpoints")
 
         # backup any existing models
-        backup_path = params.ckpt_dir + "_" + "-".join(time.ctime().split(" ")).replace(':','-')
+        backup_path = params.base_model_ckpt_dir + "_" + "-".join(time.ctime().split(" ")).replace(':','-')
 
-        shutil.copytree(params.ckpt_dir,backup_path)
+        shutil.copytree(params.base_model_ckpt_dir,backup_path)
         print("Backed up previous model in:",backup_path)
 
         # Create a summary to monitor cost tensor
@@ -390,8 +390,8 @@ def train_loop(params):
                     
                     # Create checkpoint
                     if params.save_model == True:
-                        print("Creating checkpoint in:",params.ckpt_path)
-                        saver.save(sess, params.ckpt_path)
+                        print("Creating checkpoint in:",params.base_model_ckpt_path)
+                        saver.save(sess, params.base_model_ckpt_path)
 
                 # update tensorboard summary
                 summary_writer.add_summary(summary,total_batches)
