@@ -25,7 +25,7 @@ import tldr_model
 def run_program(params):
     
     if params.parse_cnn_stories:
-        dataset_helper.generate_dataset(params)   
+        dataset_helper.parse_cnn_stories(params)   
     else:
         tldr_model.train(params)
  
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--batch_size",type=int,default=128,help="batch size")
-    parser.add_argument("--vocab_size",type=int,default=20000,help="vocabulary size to generate when generating the full dataset")
+    parser.add_argument("--vocab_size",type=int,default=40000,help="vocabulary size to generate when generating the full dataset")
     parser.add_argument("--hidden_units",type=int,default=128,help="number of LSTM hidden units")
     parser.add_argument("--embedding_size",type=int,default=128,help="number of embedding dimensions")
     parser.add_argument("--max_grad_norm",type=int,default=1,help="max grad norm. typically integer 1 through 5")

@@ -3,5 +3,6 @@
 *.out
 /data
 /models*
+/rouge
 /logs
 /__pycache__

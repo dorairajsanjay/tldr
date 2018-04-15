@@ -13,6 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 
+import tensorflow as tf
+
 class ModelParams(object):
     batch_size = 0
     hidden_units = 0
@@ -32,6 +34,8 @@ class ModelParams(object):
     test_out_file = ""
     dev_in_file = "dev.in"
     dev_out_file = "dev.out"
+    
+    dtype = tf.float32
     
     save_model = True
     
@@ -70,6 +74,9 @@ class ModelParams(object):
     # max summary to generate
     max_summary_length = 20
     max_display_len = 12
+    
+    # for dropout
+    keep_prob = 0.5
 
     max_training_epochs = 100
     batch_stats_display_count = 10
@@ -78,9 +85,12 @@ class ModelParams(object):
     ckpt_path = './models/model.ckpt'
     ckpt_dir  = './models'
     
-    # tensorflow variables
+    rouge_evaluation_dir = "./rouge"
+    
+    # learned tensorflow variables
     train_loss = None
     update_step = None
     train_predictions = None
     test_predictions = None
+
 
