@@ -1,17 +1,19 @@
 # tldr
-text summarizer
 
-## To parse the CNN stories, generate vocab and dump into a pickle file for later dataset generation
+tldr is an experimental text summarizer that uses sequence to sequence neural machine learning models.
+
+### To parse the CNN stories, generate vocab and dump into a pickle file for later dataset generation
 python tldr_main.py --parse_cnn_stories
 
-## To regenerate dataset. This is required to be done once. Subsequent attempts load from a pickle file
+### To regenerate dataset. This is required to be done once. Subsequent attempts load from a pickle file
 python tldr_main.py --regenerate_dataset
 
-## To train and validate 
+### To train and validate 
 python tldr_main.py 
 
-### Below are defaults used by the model. They can be changed using the syntax below
+#### Below are defaults used by the model. They can be changed using the syntax below
 
+```
 batch size             :128
 vocab size             :20000
 hidden units           :128
@@ -29,9 +31,9 @@ training stories file  :train.in
 training summaries file:train.out
 test stories file      :test.in
 test summaries file    :test.out
-
-## Syntax
-
+```
+### Syntax
+```
 usage: tldr_main.py [-h] [--batch_size BATCH_SIZE] [--vocab_size VOCAB_SIZE]
                     [--hidden_units HIDDEN_UNITS]
                     [--embedding_size EMBEDDING_SIZE]
@@ -84,4 +86,4 @@ optional arguments:
   --test_out_file TEST_OUT_FILE
                         test summaries file
                         
-                        
+  ```                      
