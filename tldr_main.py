@@ -41,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_units",type=int,default=128,help="number of LSTM hidden units")
     parser.add_argument("--embedding_size",type=int,default=128,help="number of embedding dimensions")
     parser.add_argument("--max_grad_norm",type=int,default=1,help="max grad norm. typically integer 1 through 5")
-    parser.add_argument("--learning_rate",type=float,default=0.001,help="learning rate")
+    parser.add_argument("--learning_rate",type=float,default=0.0001,help="learning rate")
 
     parser.add_argument("--model_dir",default="./models",help="path to saved models")
     parser.add_argument("--ignore_checkpoint", action='store_true',help="ignore existing checkpoints for restore")

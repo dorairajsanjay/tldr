@@ -76,7 +76,7 @@ class ModelParams(object):
     max_display_len = 12
     
     # for dropout
-    keep_prob = 0.5
+    keep_prob = 0.8
 
     max_training_epochs = 100
     batch_stats_display_count = 10

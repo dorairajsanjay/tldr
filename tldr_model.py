@@ -196,8 +196,6 @@ def create_model(params):
 
         # basic LSTM decoder cell
         params.train_decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="train_decoder_lstm_cell")
-        params.train_decoder_cell = tf.nn.rnn_cell.DropoutWrapper(params.train_decoder_cell,
-                                                                output_keep_prob=params.keep_prob)
         
         params.train_attn_cell = tf.contrib.seq2seq.AttentionWrapper(
                 params.train_decoder_cell , params.train_attention_mechanism, 
@@ -306,8 +304,9 @@ def create_model(params):
                                     average_across_timesteps=False,
                                     average_across_batch=False)
 
+    # I might have to divide by batch size to make the loss invariant to batch size 
+    # See https://www.tensorflow.org/tutorials/seq2seq
     params.train_loss = tf.reduce_mean(params.sequence_loss)
-
 
     # Gradient computation and optimization
     # gradient computation
