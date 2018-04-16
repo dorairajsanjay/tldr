@@ -1,6 +1,10 @@
 # tldr
 
-tldr is an experimental text summarizer that uses sequence to sequence neural machine learning models.
+tldr is an experimental text summarizer that uses sequence to sequence neural machine learning models and an n-gram language model similar to other traditional noisy channel approaches.
+
+The network diagram is shown below
+
+![alt text](https://github.com/dorairajsanjay/tldr/blob/master/tldr_network_diagram.png)
 
 ### To parse the CNN stories, generate vocab and dump into a pickle file for later dataset generation
 
@@ -105,7 +109,7 @@ optional arguments:
   
   ##### tldr_model.py
   
-  Slightly advanced seq2seq summarization featuring Dropout and Bahdanau attention. 
+  Slightly advanced seq2seq summarization featuring Dropout and Bahdanau attention and Beam Search
   
   #### Modules
   
