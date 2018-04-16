@@ -81,6 +81,10 @@ class ModelParams(object):
     max_training_epochs = 100
     batch_stats_display_count = 10
     
+    # inference
+    inference_style = "beam_search"
+    beam_width = 10
+    
     logs_path = './logs'
     
     ckpt_path = './models/model.ckpt'

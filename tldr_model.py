@@ -234,63 +234,127 @@ def create_model(params):
 
     with tf.variable_scope('test_decoder'):
         
-        params.test_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
-                  num_units=params.hidden_units, 
-                  #memory = tf.reshape(params.encoder_outputs,[params.batch_size,params.encoder_max_time,params.hidden_units]),
-                  memory = tf.transpose(params.encoder_outputs, [1, 0, 2]),
-                  memory_sequence_length=params.source_sequence_length,
-                  normalize = True
-        )
-
         # basic LSTM decoder cell
         params.test_decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="test_decoder_lstm_cell")
         
-        params.test_attn_cell = tf.contrib.seq2seq.AttentionWrapper(
-                params.test_decoder_cell , params.test_attention_mechanism, 
-                    alignment_history=True, attention_layer_size=params.hidden_units)
-
-        # add projection layer
-        params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_attn_cell,params.final_vocab_size)
-
         params.start_tokens = tf.tile(tf.constant([params.sentence_start_index],  
-                                   dtype=tf.int32),  
-                                   [params.batch_size], 
-                                   name='start_tokens')
+                           dtype=tf.int32),  
+                           [params.batch_size], 
+                           name='start_tokens')
 
-        sentence_end_index = params.sentence_end_index # see vocab creation logic
+        if params.inference_style == "greedy":
 
-        params.test_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-                                                  params.decoder_emb,
-                                                  params.start_tokens,
-                                                  params.sentence_end_index)
+            params.test_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+                      num_units=params.hidden_units, 
+                      memory = tf.transpose(params.encoder_outputs, [1, 0, 2]),
+                      memory_sequence_length=params.source_sequence_length,
+                      normalize = True
+            )
+    
+            params.test_decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
+                    params.test_decoder_cell , params.test_attention_mechanism, 
+                        alignment_history=True, attention_layer_size=params.hidden_units)
 
-        # Decoder
-        initial_state = params.test_decoder_cell.zero_state(params.batch_size, params.dtype).clone(
-                                                                  cell_state=params.encoder_state)
-        params.test_decoder = tf.contrib.seq2seq.BasicDecoder(
-                                cell = params.test_decoder_cell, 
-                                helper = params.test_helper, 
-                                #initial_state=params.test_decoder_cell.zero_state(
-                                #    dtype=tf.float32, batch_size=params.batch_size))
-                                initial_state = initial_state)
+            # add projection layer
+            params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size)            
+            params.test_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+                                                      params.decoder_emb,
+                                                      params.start_tokens,
+                                                      params.sentence_end_index)
+
+            # Decoder
+            initial_state = params.test_decoder_cell.zero_state(params.batch_size, params.dtype).clone(
+                                                                      cell_state=params.encoder_state)
+            params.test_decoder = tf.contrib.seq2seq.BasicDecoder(
+                                    cell = params.test_decoder_cell, 
+                                    helper = params.test_helper, 
+                                    #initial_state=params.test_decoder_cell.zero_state(
+                                    #    dtype=tf.float32, batch_size=params.batch_size))
+                                    initial_state = initial_state)
+
+            # Decoder
+            #params.test_decoder = tf.contrib.seq2seq.BasicDecoder(
+            #                        cell = params.test_decoder_cell, 
+            #                        helper = params.test_helper, 
+            #                        initial_state = params.encoder_state)
+
+            # Dynamic decoding
+            params.test_output_states,params.test_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
+                                                                        params.test_decoder,
+                                                                        maximum_iterations=params.max_summary_length,
+                                                                        output_time_major = True)
+            # logits = [batch x seq_len x decoder_vocabulary_size]
+            params.test_logits = params.test_output_states.rnn_output
+
+            # predictions = [batch x seq_len]
+            params.test_predictions = tf.identity(params.test_output_states.sample_id)
             
-        # Decoder
-        #params.test_decoder = tf.contrib.seq2seq.BasicDecoder(
-        #                        cell = params.test_decoder_cell, 
-        #                        helper = params.test_helper, 
-        #                        initial_state = params.encoder_state)
-
-        # Dynamic decoding
-        params.test_output_states,params.test_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
-                                                                    params.test_decoder,
-                                                                    maximum_iterations=params.max_summary_length,
-                                                                    output_time_major = True)
-        # logits = [batch x seq_len x decoder_vocabulary_size]
-        params.test_logits = params.test_output_states.rnn_output
-
-        # predictions = [batch x seq_len]
-        params.test_predictions = tf.identity(params.test_output_states.sample_id)
-
+        elif params.inference_style == "beam_search":
+            
+            # See https://www.tensorflow.org/tutorials/seq2seq for more information
+            # and https://github.com/tensorflow/tensorflow/issues/11598
+            # and https://www.tensorflow.org/api_docs/python/tf/contrib/seq2seq/BeamSearchDecoder
+            # and https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/seq2seq/python/kernel_tests/beam_search_decoder_test.py
+            # and https://github.com/tensorflow/tensorflow/issues/13154 (Note that alignment history was disabled since it was not supported in BeamSearchDecoder
+            
+            initial_state = params.test_decoder_cell.zero_state(params.batch_size,params.dtype)
+            
+            #encoder_outputs_t = tf.transpose(params.encoder_outputs, [1, 0, 2])
+            tiled_encoder_outputs = tf.contrib.seq2seq.tile_batch(
+                                        params.encoder_outputs, multiplier=params.beam_width)
+            
+            tiled_encoder_final_state = tf.contrib.seq2seq.tile_batch(
+                                        params.encoder_state, multiplier=params.beam_width)
+            tiled_sequence_length = tf.contrib.seq2seq.tile_batch(
+                                        params.source_sequence_length, multiplier=params.beam_width)
+            
+            params.test_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+                      num_units=params.hidden_units, 
+                      memory = tiled_encoder_outputs,
+                      memory_sequence_length=tiled_sequence_length,
+                      normalize = True)            
+            
+            initial_state = tf.contrib.seq2seq.tile_batch(initial_state,multiplier=params.beam_width)    
+            
+            params.test_decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
+                                                params.test_decoder_cell , 
+                                                params.test_attention_mechanism, 
+                                                #alignment_history=True, 
+                                                attention_layer_size=params.hidden_units)
+            
+            cell_state = params.test_decoder_cell.zero_state(params.batch_size * params.beam_width,params.dtype)
+            cell_state = cell_state.clone(cell_state=initial_state)
+            
+            # add projection layer
+            params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size) 
+            
+            params.test_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
+                cell = params.test_decoder_cell,
+                embedding = params.decoder_emb,
+                start_tokens = params.start_tokens,
+                end_token = params.sentence_end_index,
+                initial_state = cell_state,
+                beam_width = params.beam_width,
+                length_penalty_weight = 0.0)
+            
+            # Dynamic decoding
+            params.test_output_states,_,_ = tf.contrib.seq2seq.dynamic_decode(
+                                                                        params.test_decoder,
+                                                                        impute_finished = False,
+                                                                        maximum_iterations=params.max_summary_length,
+                                                                        output_time_major = True)
+            
+            #params.test_predictions = params.test_output_states.sample_id
+            
+            # get predictions
+            translations = params.test_output_states
+            params.test_predictions = tf.identity(translations[0])
+            
+            # convert to [batch_size,beam_width,time] format
+            #translations = tf.transpose(translations, [1, 0, 2])
+            
+            # get the first prediction
+            #params.test_predictions = tf.identity(translations[0])
 
     # Loss
 
