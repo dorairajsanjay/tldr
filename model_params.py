@@ -14,8 +14,10 @@
 # ==============================================================================
 
 import tensorflow as tf
+import lm_text_selector
 
 class ModelParams(object):
+    
     batch_size = 0
     hidden_units = 0
     embedding_size = 0
@@ -100,5 +102,8 @@ class ModelParams(object):
     update_step = None
     train_predictions = None
     test_predictions = None
+    
+    # initialize the text selector object
+    lm_text_selector = LMTextSelector()
 
 

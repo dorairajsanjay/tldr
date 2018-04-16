@@ -347,8 +347,8 @@ def create_model(params):
             #params.test_predictions = params.test_output_states.sample_id
             
             # get predictions
-            translations = params.test_output_states
-            params.test_predictions = tf.identity(translations[0])
+            params.test_predictions  = params.test_output_states
+            #params.test_predictions = tf.identity(summaries[0])
             
             # convert to [batch_size,beam_width,time] format
             #translations = tf.transpose(translations, [1, 0, 2])
