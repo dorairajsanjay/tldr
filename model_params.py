@@ -82,7 +82,7 @@ class ModelParams(object):
     batch_stats_display_count = 10
     
     # inference
-    inference_style = "beam_search"
+    inference_style = "greedy_search"
     beam_width = 10
     
     logs_path = './logs'

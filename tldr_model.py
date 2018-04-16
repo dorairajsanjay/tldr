@@ -242,7 +242,7 @@ def create_model(params):
                            [params.batch_size], 
                            name='start_tokens')
 
-        if params.inference_style == "greedy":
+        if params.inference_style == "greedy_search":
 
             params.test_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
                       num_units=params.hidden_units, 
