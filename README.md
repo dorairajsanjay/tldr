@@ -105,7 +105,7 @@ optional arguments:
   
   ##### tldr_model.py
   
-  Slightly advanced seq2seq summarization featuring Dropout and Bahdanau attention. 
+  Slightly advanced seq2seq summarization featuring Dropout and Bahdanau attention and Beam Search
   
   #### Modules
   
