@@ -97,6 +97,15 @@ optional arguments:
   1. RNN/LSTM based sequence to sequence network
   2. General utility/debugging features - tensorboard, model persistence
   
+  #### Models
+  
+  ##### tldr_model_base.py
+  
+  Implements basic seq2seq summarization. A simple LSTM encoder and decoder
+  
+  ##### tldr_model.py
+  
+  Slightly advanced seq2seq summarization featuring Dropout and Bahdanau attention. 
   
   #### Modules
   
