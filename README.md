@@ -36,6 +36,8 @@ python tldr_main.py --inference_style  "greedy_search"
 This option simply does a greedy_search at the decoder output and displays the corresponding summary
 ```
 
+All models are checkpointed so you should not have to restart training from the beginning. Note that previous models get saved in a separate folder, so they may accumalate and take up space. Make sure to delete those folders in that case.
+
 #### Below are defaults used by the model. They can be changed using the syntax below
 
 ```
