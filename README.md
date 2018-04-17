@@ -4,6 +4,8 @@ tldr is an experimental text summarizer that uses sequence to sequence neural ma
 
 The language model uses the Brown corpus. It compares a subset of top Beam search scores and their bigram likelihood scores and picks the one with the highest bigram likelihood.
 
+See pip_env_list.txt and conda_env_list.txt for a list of all installed packages in the conda environment.
+
 The network diagram is shown below
 
 ![alt text](https://github.com/dorairajsanjay/tldr/blob/master/tldr_network_diagram.png)
