@@ -1,6 +1,8 @@
 # tldr
 
-tldr is an experimental text summarizer that uses sequence to sequence neural machine learning models and an n-gram language model similar to other traditional noisy channel approaches.
+tldr is an experimental text summarizer that uses sequence to sequence neural machine learning models and an n-gram language model similar to other traditional noisy channel approaches. 
+
+The language model uses the Brown corpus. It compares a subset of top Beam search scores and their bigram likelihood scores and picks the one with the highest bigram likelihood.
 
 The network diagram is shown below
 
