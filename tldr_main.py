@@ -42,6 +42,7 @@ if __name__ == "__main__":
     parser.add_argument("--embedding_size",type=int,default=128,help="number of embedding dimensions")
     parser.add_argument("--max_grad_norm",type=int,default=1,help="max grad norm. typically integer 1 through 5")
     parser.add_argument("--learning_rate",type=float,default=0.0001,help="learning rate")
+    parser.add_argument("--keep_prob",type=float,default=0.8,help="keep probability. this is (1 - the drop-out probability)")
 
     parser.add_argument("--model_dir",default="./models",help="path to saved models")
     parser.add_argument("--ignore_checkpoint", action='store_true',help="ignore existing checkpoints for restore")
@@ -58,23 +59,43 @@ if __name__ == "__main__":
     parser.add_argument("--test_in_file",default="test.in",help="test stories file")
     parser.add_argument("--test_out_file",default="test.out",help="test summaries file")
     
+    parser.add_argument("--inference_style",default="beam_search",help="type of inference - beam_search or greedy_search")
+    parser.add_argument("--beam_width",type=int,default=10,help="beam search width or beam size")
+    parser.add_argument("--lm_beam_width",type=int,default=3,help="beam search outputs for validation against the language model")
+    
+    parser.add_argument("--max_display_len",type=int,default=12,help="number of words to pick when displaying summary")
+    parser.add_argument("--max_summary_len",type=int,default=20,help="number of words to pick for the summary")
+    parser.add_argument("--encoder_max_time",type=int,default=300,help="number of steps to unroll for the encoder")
+    parser.add_argument("--decoder_max_time",type=int,default=20,help="number of steps to unroll for the summary")
+    
+    
     args = parser.parse_args()
     
     # display arguments
     print("Running program with below arguments:\n")
     
+    print("\nTraining properties:")
     print("batch size             :%d"    % args.batch_size); params.batch_size = args.batch_size
     print("vocab size             :%d"    % args.vocab_size); params.vocab_size = args.vocab_size    
     print("hidden units           :%d"    % args.hidden_units); params.hidden_units = args.hidden_units
     print("embedding size         :%d"    % args.embedding_size); params.embedding_size = args.embedding_size
     print("max grad norm          :%d"    % args.max_grad_norm); params.max_grad_norm = args.max_grad_norm
     print("learning rate          :%0.4f" % args.learning_rate); params.learning_rate = args.learning_rate
+    print("encoder max time       :%d"    % args.encoder_max_time); params.encoder_max_time = args.encoder_max_time     
+    print("decoder max time       :%d"    % args.decoder_max_time); params.decoder_max_time = args.decoder_max_time    
+    print("keep probability       :%0.4f" % args.keep_prob); params.keep_prob = args.keep_prob  
+    
+    print("\n Inference properties:")
+    print("inference_style        :%s"    % args.inference_style); params.inference_style = args.inference_style     
+    print("beam width             :%d"    % args.beam_width); params.beam_width = args.beam_width     
+    print("lm beam width          :%d"    % args.lm_beam_width); params.lm_beam_width = args.lm_beam_width       
+    
+    print("\nEnvironment properties:")
     print("model directory        :%s"    % args.model_dir); params.model_dir = args.model_dir
     print("ignore checkpoints     :%s"    % args.ignore_checkpoint); params.ignore_checkpoint = args.ignore_checkpoint
     print("data directory         :%s"    % args.data_dir); params.data_dir = args.data_dir
     print("parse cnn stories      :%s"    % args.parse_cnn_stories); params.parse_cnn_stories = args.parse_cnn_stories
-    print("regenerate dataset     :%s"    % args.regenerate_dataset); params.regenerate_dataset = args.regenerate_dataset
-                        
+    print("regenerate dataset     :%s"    % args.regenerate_dataset); params.regenerate_dataset = args.regenerate_dataset           
     print("story vocab file       :%s"    % args.story_vocab_file); params.story_vocab_file = args.story_vocab_file
     print("summary vocab file     :%s"    % args.summary_vocab_file); params.summary_vocab_file = args.summary_vocab_file
     print("training stories file  :%s"    % args.train_in_file); params.train_in_file = args.train_in_file
@@ -82,6 +103,10 @@ if __name__ == "__main__":
     print("test stories file      :%s"    % args.test_in_file); params.test_in_file = args.test_in_file     
     print("test summaries file    :%s"    % args.test_out_file); params.test_out_file = args.test_out_file  
     
+    print("\n Display properties:")
+    print("max display len        :%d"    % args.max_display_len); params.max_display_len = args.max_display_len     
+    print("max summary len        :%d"    % args.max_summary_len); params.max_summary_len = args.max_summary_len     
+
     print("#"*80)
     
     # Run program

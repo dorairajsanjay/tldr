@@ -86,6 +86,7 @@ class ModelParams(object):
     # inference
     inference_style = "beam_search"
     beam_width = 10
+    lm_beam_width = 3
     
     logs_path = './logs'
     

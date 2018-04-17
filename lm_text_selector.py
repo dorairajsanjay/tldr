@@ -43,20 +43,24 @@ class LMTextSelector:
         best_log_p = 0
         
         #print("LM Selector: Number of summaries:%d, Total Brown Bigram Count:%d" % (len(summaries),self.bigrams_count))
-        
+        print("Count of bigrams:",self.bigrams_count)
         for summary in summaries:
             
             # obtain all bigrams
             bigrams = nltk.bigrams(summary.split())
-            
-            #print("Individual summary bigrams:",bigrams)
             
             # compute the score for each bigram
             total_log_p = 0
             for b in bigrams:
                 frequency = self.cfd[b[0]][b[1]]
 
-                log_p = np.log(frequency/self.bigrams_count)
+                temp = frequency/self.bigrams_count
+                #print("temp is:",temp)
+                if temp == 0:
+                    log_p = 0
+                    #print("Forcing log_p to 0 since frequency/self.bigrams_count is 0")
+                else:
+                    log_p = np.log(temp)
                 
                 total_log_p += log_p
                 

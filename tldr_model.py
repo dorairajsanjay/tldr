@@ -140,7 +140,8 @@ def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_
     
     # display all possible summaries using beam search
     possible_summaries = []
-    for i in range(0,predicted_ids.shape[1]):
+    lm_eval_count = params.lm_beam_width if predicted_ids.shape[1] > params.lm_beam_width else predicted_ids.shape[1]
+    for i in range(0,lm_eval_count):
         
         test_pred_ids = predicted_ids[sample_id][i]
 
@@ -578,7 +579,11 @@ def train_loop(params):
                 
                 # display stats and create checkpoint
                 if batches_count % params.batch_stats_display_count == 0:
-                    display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds)
+                    
+                    if params.inference_style == "greedy_search":
+                        display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds)
+                    else:
+                        display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds)
                     
                     # Create checkpoint
                     if params.save_model == True:
