@@ -118,7 +118,7 @@ def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_
     # display testing results    
     
     predicted_ids = test_preds[0].predicted_ids
-    print("test_preds.shape - before reshaping:",predicted_ids.shape)
+    #print("test_preds.shape - before reshaping:",predicted_ids.shape)
     predicted_ids = np.reshape(predicted_ids,(predicted_ids.shape[1],predicted_ids.shape[2],predicted_ids.shape[0]))
     
     #print("type(test_preds):",type(predicted_ids))
