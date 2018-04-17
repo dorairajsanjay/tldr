@@ -84,6 +84,92 @@ def display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_v
     # dump stats for rouge computation
     dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds)
     
+
+def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds):
+    
+    # extract data from train and test batches for display
+    (raw_enc_in_batch,enc_in_batch,enc_in_batch_len,
+        raw_dec_in_batch,dec_in_batch,dec_in_batch_len,
+        raw_dec_out_batch,dec_out_batch,dec_out_batch_len) = train_batch
+        
+    (test_raw_enc_in_batch,test_enc_in_batch,test_enc_in_batch_len,
+        test_raw_dec_in_batch,test_dec_in_batch,test_dec_in_batch_len,
+        test_raw_dec_out_batch,test_dec_out_batch,test_dec_out_batch_len) = test_batch
+    
+    # length of output story and summary                    
+    sample_id = np.random.randint(0,params.batch_size)
+
+    # displaying training results
+    print("Epoch:%d,Completed Batches:%d, Loss:%0.4f" % (epoch_index,batches_count,loss_value))
+    print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len]))
+    print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len]))
+
+    #print("type(train_preds):%s,train_preds.shape:%s" % (type(train_preds),train_preds.shape))
+
+    train_preds = np.transpose(train_preds)
+    train_pred_ids = train_preds[sample_id]
+
+    #print("preds:\n",train_preds)
+    train_summary = [params.summary_dicts[1][x] for x in train_pred_ids]
+
+    print("Train. New  Summary:"," ".join(train_summary[:
+                        params.max_display_len if len(train_summary)<params.max_display_len else len(train_summary)])) 
+
+    # display testing results    
+    
+    predicted_ids = test_preds[0].predicted_ids
+    print("test_preds.shape - before reshaping:",predicted_ids.shape)
+    predicted_ids = np.reshape(predicted_ids,(predicted_ids.shape[1],predicted_ids.shape[2],predicted_ids.shape[0]))
+    
+    #print("type(test_preds):",type(predicted_ids))
+    #print("test_preds:\n",predicted_ids)
+    #print("test_preds.shape:",predicted_ids.shape)
+    
+    if len(test_raw_enc_in_batch) < sample_id:
+        print("len(test_raw_enc_in_batch) < sample_id...resetting sample_id to 0")
+        print("test_raw_enc_in_batch:\n",test_raw_enc_in_batch)
+        sample_id = 0
+
+    #print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
+    print("\nTest. Story       :"," ".join(test_raw_enc_in_batch[sample_id][:
+                        params.max_display_len if len(test_raw_enc_in_batch[sample_id]) > params.max_display_len else len(test_raw_enc_in_batch[sample_id])]))
+    print("Test. Original Summary:", " ".join(test_raw_dec_in_batch[sample_id][:params.max_display_len if len(test_raw_dec_in_batch[sample_id])>params.max_display_len else len(test_raw_dec_in_batch[sample_id])]))  
+
+    #print("type(test_preds):%s,len(test_preds):%d" % (type(test_preds),len(test_preds)))
+    #print("test_preds:\n",test_preds)
+    
+    # display all possible summaries using beam search
+    possible_summaries = []
+    for i in range(0,predicted_ids.shape[1]):
+        
+        test_pred_ids = predicted_ids[sample_id][i]
+
+        #test_preds = test_preds[0]
+
+        #print("type(test_preds):%s,test_preds.shape:%s" % (type(test_preds),test_preds.shape))
+
+        #test_preds = np.transpose(test_preds)
+        #test_pred_ids = test_preds[sample_id]
+
+        #print("test_preds:\n",test_preds)
+        test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]    
+        summary = " ".join(test_summary[:
+                    params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)])
+        print("Test. New Summary:%d:%s" % (i,summary))
+        
+        # add to set of possible summaries 
+        possible_summaries.append(summary)
+        
+    # find the best summary using the n-gram language model
+    best_summary = params.lts.getBest(possible_summaries)
+    
+    print("Best Summary:",best_summary)
+
+    print("-"*80)   
+    
+    # dump stats for rouge computation
+    dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds)
+    
 def dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds):
     
     if len(test_raw_dec_in_batch) != len(test_preds):
@@ -299,9 +385,9 @@ def create_model(params):
             
             initial_state = params.test_decoder_cell.zero_state(params.batch_size,params.dtype)
             
-            #encoder_outputs_t = tf.transpose(params.encoder_outputs, [1, 0, 2])
+            encoder_outputs_t = tf.transpose(params.encoder_outputs, [1, 0, 2])
             tiled_encoder_outputs = tf.contrib.seq2seq.tile_batch(
-                                        params.encoder_outputs, multiplier=params.beam_width)
+                                        encoder_outputs_t, multiplier=params.beam_width)
             
             tiled_encoder_final_state = tf.contrib.seq2seq.tile_batch(
                                         params.encoder_state, multiplier=params.beam_width)
@@ -351,7 +437,8 @@ def create_model(params):
             #params.test_predictions = tf.identity(summaries[0])
             
             # convert to [batch_size,beam_width,time] format
-            #translations = tf.transpose(translations, [1, 0, 2])
+            #params.test_predictions = tf.cast(params.test_predictions, tf.int32)
+            #params.test_predictions = tf.transpose(params.test_predictions, [1, 2, 0])
             
             # get the first prediction
             #params.test_predictions = tf.identity(translations[0])
@@ -491,7 +578,7 @@ def train_loop(params):
                 
                 # display stats and create checkpoint
                 if batches_count % params.batch_stats_display_count == 0:
-                    display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds)
+                    display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds)
                     
                     # Create checkpoint
                     if params.save_model == True:

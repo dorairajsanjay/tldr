@@ -17,8 +17,9 @@
 
 import nltk
 from nltk.corpus import brown
+import numpy as np
 
-class LMTextSelector(object):
+class LMTextSelector:
     
     def __init__(self):
         
@@ -27,12 +28,13 @@ class LMTextSelector(object):
         self.cfd = nltk.ConditionalFreqDist(brown_bigrams)
         self.bigrams_count = len(brown.words())
         
-    def getBest(summaries):
+    def getBest(self,summaries):
         
         '''
         Input:
-            summaries is a list of all possible summaries
-            we use the bigram probability to compute the best summary
+             - summaries is a list of all possible summaries
+            - each summary is a string of words
+            - we use the bigram probability to compute the best summary
         Output:
             best sentence (string)
         '''
@@ -40,21 +42,27 @@ class LMTextSelector(object):
         best_summary = None
         best_log_p = 0
         
+        #print("LM Selector: Number of summaries:%d, Total Brown Bigram Count:%d" % (len(summaries),self.bigrams_count))
+        
         for summary in summaries:
             
             # obtain all bigrams
             bigrams = nltk.bigrams(summary.split())
             
+            #print("Individual summary bigrams:",bigrams)
+            
             # compute the score for each bigram
             total_log_p = 0
             for b in bigrams:
                 frequency = self.cfd[b[0]][b[1]]
-                log_p = log(frequence/self.bigrams_count)
+
+                log_p = np.log(frequency/self.bigrams_count)
                 
                 total_log_p += log_p
                 
-            if total_log_p > best_log_p:
+            if best_summary == None or total_log_p > best_log_p:
                 best_summary = summary
+                best_log_p = total_log_p
                 
         return best_summary
             
