@@ -22,17 +22,42 @@ python tldr_main.py --regenerate_dataset
 ### To train and validate 
 python tldr_main.py 
 
+There are several options here, but the key are two options
+```
+python tldr_main.py --inference_style "beam_search"
+
+This is the default option.
+It does inference using beam_search and also uses the language model for surfacing up the best summary according to the language model.
+```
+and
+```
+python tldr_main.py --inference_style  "greedy_search"
+
+This option simply does a greedy_search at the decoder output and displays the corresponding summary
+```
+
 #### Below are defaults used by the model. They can be changed using the syntax below
 
 ```
+Training properties:
 batch size             :128
-vocab size             :20000
+vocab size             :40000
 hidden units           :128
 embedding size         :128
 max grad norm          :1
-learning rate          :0.0010
+learning rate          :0.0001
+encoder max time       :300
+decoder max time       :20
+keep probability       :0.8000
+
+ Inference properties:
+inference_style        :beam_search
+beam width             :10
+lm beam width          :3
+
+Environment properties:
 model directory        :./models
-restore model path     :False
+ignore checkpoints     :False
 data directory         :./data
 parse cnn stories      :False
 regenerate dataset     :False
@@ -42,6 +67,10 @@ training stories file  :train.in
 training summaries file:train.out
 test stories file      :test.in
 test summaries file    :test.out
+
+ Display properties:
+max display len        :12
+max summary len        :20
 ```
 ### Syntax
 ```
@@ -49,15 +78,22 @@ usage: tldr_main.py [-h] [--batch_size BATCH_SIZE] [--vocab_size VOCAB_SIZE]
                     [--hidden_units HIDDEN_UNITS]
                     [--embedding_size EMBEDDING_SIZE]
                     [--max_grad_norm MAX_GRAD_NORM]
-                    [--learning_rate LEARNING_RATE] [--model_dir MODEL_DIR]
-                    [--restore_saved_model] [--data_dir DATA_DIR]
-                    [--parse_cnn_stories] [--regenerate_dataset]
+                    [--learning_rate LEARNING_RATE] [--keep_prob KEEP_PROB]
+                    [--model_dir MODEL_DIR] [--ignore_checkpoint]
+                    [--data_dir DATA_DIR] [--parse_cnn_stories]
+                    [--regenerate_dataset]
                     [--story_vocab_file STORY_VOCAB_FILE]
                     [--summary_vocab_file SUMMARY_VOCAB_FILE]
                     [--train_in_file TRAIN_IN_FILE]
                     [--train_out_file TRAIN_OUT_FILE]
                     [--test_in_file TEST_IN_FILE]
                     [--test_out_file TEST_OUT_FILE]
+                    [--inference_style INFERENCE_STYLE]
+                    [--beam_width BEAM_WIDTH] [--lm_beam_width LM_BEAM_WIDTH]
+                    [--max_display_len MAX_DISPLAY_LEN]
+                    [--max_summary_len MAX_SUMMARY_LEN]
+                    [--encoder_max_time ENCODER_MAX_TIME]
+                    [--decoder_max_time DECODER_MAX_TIME]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -74,10 +110,12 @@ optional arguments:
                         max grad norm. typically integer 1 through 5
   --learning_rate LEARNING_RATE
                         learning rate
+  --keep_prob KEEP_PROB
+                        keep probability. this is (1 - the drop-out
+                        probability)
   --model_dir MODEL_DIR
                         path to saved models
-  --restore_saved_model
-                        restore saved model
+  --ignore_checkpoint   ignore existing checkpoints for restore
   --data_dir DATA_DIR   path to data
   --parse_cnn_stories   parses CNN dataset. Generates stories and vocab files
                         in <data_dir>. Expects unzipped cnn stores in data
@@ -96,7 +134,21 @@ optional arguments:
                         test stories file
   --test_out_file TEST_OUT_FILE
                         test summaries file
-                        
+  --inference_style INFERENCE_STYLE
+                        type of inference - beam_search or greedy_search
+  --beam_width BEAM_WIDTH
+                        beam search width or beam size
+  --lm_beam_width LM_BEAM_WIDTH
+                        beam search outputs for validation against the
+                        language model
+  --max_display_len MAX_DISPLAY_LEN
+                        number of words to pick when displaying summary
+  --max_summary_len MAX_SUMMARY_LEN
+                        number of words to pick for the summary
+  --encoder_max_time ENCODER_MAX_TIME
+                        number of steps to unroll for the encoder
+  --decoder_max_time DECODER_MAX_TIME
+                        number of steps to unroll for the summary
   ```  
   #### Features
   
