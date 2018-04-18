@@ -21,7 +21,7 @@ python tldr_main.py --parse_cnn_stories
 ### To regenerate dataset. This is required to be done once. Subsequent attempts load from a pickle file
 python tldr_main.py --regenerate_dataset
 
-### To train and validate 
+### To train and batch validate
 python tldr_main.py 
 
 There are several options here, but the key are two options
@@ -36,6 +36,13 @@ and
 python tldr_main.py --inference_style  "greedy_search"
 
 This option simply does a greedy_search at the decoder output and displays the corresponding summary
+```
+
+### To perform inference only on a single story fed at a time
+
+```
+python tldr_main.py --mode="inference_only"
+If inference_only is enabled, add stories to inference.in in the format <transaction_id>,<story>. The result will be added to inference.out in the format <transaction_id>,<summary_id>. The transaction_id is used to correlate the summary back to the input story.
 ```
 
 All models are checkpointed so you should not have to restart training from the beginning. Note that previous models get saved in a separate folder, so they may accumalate and take up space. Make sure to delete those folders in that case.
@@ -54,10 +61,11 @@ encoder max time       :300
 decoder max time       :20
 keep probability       :0.8000
 
- Inference properties:
+Inference properties:
 inference_style        :beam_search
 beam width             :10
 lm beam width          :3
+mode                   :inference_only
 
 Environment properties:
 model directory        :./models
@@ -71,8 +79,10 @@ training stories file  :train.in
 training summaries file:train.out
 test stories file      :test.in
 test summaries file    :test.out
+inference input file   :inference.in
+inference out file     :inference.out
 
- Display properties:
+Display properties:
 max display len        :12
 max summary len        :20
 ```
@@ -92,9 +102,11 @@ usage: tldr_main.py [-h] [--batch_size BATCH_SIZE] [--vocab_size VOCAB_SIZE]
                     [--train_out_file TRAIN_OUT_FILE]
                     [--test_in_file TEST_IN_FILE]
                     [--test_out_file TEST_OUT_FILE]
+                    [--inference_in_file INFERENCE_IN_FILE]
+                    [--inference_out_file INFERENCE_OUT_FILE]
                     [--inference_style INFERENCE_STYLE]
                     [--beam_width BEAM_WIDTH] [--lm_beam_width LM_BEAM_WIDTH]
-                    [--max_display_len MAX_DISPLAY_LEN]
+                    [--mode MODE] [--max_display_len MAX_DISPLAY_LEN]
                     [--max_summary_len MAX_SUMMARY_LEN]
                     [--encoder_max_time ENCODER_MAX_TIME]
                     [--decoder_max_time DECODER_MAX_TIME]
@@ -138,6 +150,12 @@ optional arguments:
                         test stories file
   --test_out_file TEST_OUT_FILE
                         test summaries file
+  --inference_in_file INFERENCE_IN_FILE
+                        inference stories file, valid only when inference_only
+                        is enabled
+  --inference_out_file INFERENCE_OUT_FILE
+                        inference summaries file, valid only when
+                        inference_only is enabled
   --inference_style INFERENCE_STYLE
                         type of inference - beam_search or greedy_search
   --beam_width BEAM_WIDTH
@@ -145,6 +163,11 @@ optional arguments:
   --lm_beam_width LM_BEAM_WIDTH
                         beam search outputs for validation against the
                         language model
+  --mode MODE           options are train_inference and inference_only. If
+                        inference_only is enabled, add stories to inference.in
+                        in the format <story_id> <story>. The result will be
+                        added to inference.out in the format <story_id>
+                        <summary>
   --max_display_len MAX_DISPLAY_LEN
                         number of words to pick when displaying summary
   --max_summary_len MAX_SUMMARY_LEN
