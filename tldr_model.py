@@ -646,7 +646,10 @@ def test_loop(params):
         inference_file = open(params.inference_in_file,"r")
         test_stories = follow(inference_file)
         
-        for test_story in test_stories:
+        for line in test_stories:
+            
+            # format of line is transaction_id,test_story
+            transaction_id,test_story = line.split(",")
 
             # encode story
             test_story_clean = [w if w in params.story_dicts[0].keys() else params.unknown_token  for w in test_story.split()]
@@ -692,6 +695,10 @@ def test_loop(params):
                 test_summary, _ = getBestSummary(0, predicted_ids,params)   
             
             print("Test. New Summary:",test_summary)  
+            
+            # write this out to the inference output file
+            with open(params.inference_out_file,"a+") as out_file:
+                out_file.write("\n" + transaction_id + "," + test_summary)
 
                 
 def run(params):

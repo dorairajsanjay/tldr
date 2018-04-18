@@ -59,7 +59,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_in_file",default="test.in",help="test stories file")
     parser.add_argument("--test_out_file",default="test.out",help="test summaries file")
     parser.add_argument("--inference_in_file",default="inference.in",help="inference stories file, valid only when inference_only is enabled")
-    parser.add_argument("--inference_out_file",default="test.inference_out",help="inference summaries file, valid only when inference_only is enabled")
+    parser.add_argument("--inference_out_file",default="inference.out",help="inference summaries file, valid only when inference_only is enabled")
     
     parser.add_argument("--inference_style",default="beam_search",help="type of inference - beam_search or greedy_search")
     parser.add_argument("--beam_width",type=int,default=10,help="beam search width or beam size")
