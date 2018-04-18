@@ -41,9 +41,11 @@ class LMTextSelector:
         
         best_summary = None
         best_log_p = 0
+        best_summary_index = None
         
         #print("LM Selector: Number of summaries:%d, Total Brown Bigram Count:%d" % (len(summaries),self.bigrams_count))
-        print("Count of bigrams:",self.bigrams_count)
+        #print("Count of bigrams:",self.bigrams_count)
+        summary_index = 0
         for summary in summaries:
             
             # obtain all bigrams
@@ -67,8 +69,11 @@ class LMTextSelector:
             if best_summary == None or total_log_p > best_log_p:
                 best_summary = summary
                 best_log_p = total_log_p
+                best_summary_index = summary_index
                 
-        return best_summary
+            summary_index += 1
+                
+        return best_summary, best_summary_index 
             
             
         

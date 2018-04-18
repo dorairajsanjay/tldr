@@ -83,15 +83,23 @@ class ModelParams(object):
     max_training_epochs = 100
     batch_stats_display_count = 10
     
+    # training/inference or inference-only mode
+    mode = "train_inference" # options are "train_inference" and "inference_only"
+    
     # inference
     inference_style = "beam_search"
     beam_width = 10
     lm_beam_width = 3
+    batch_test_mode = 1 # 1 is enabled and 0 is disabled
+    inference_in_file = "inference.in"
+    inference_out_file = "inference.out"
     
     logs_path = './logs'
     
     ckpt_path = './models/model.ckpt'
     ckpt_dir  = './models'
+    
+    params_file = "params.txt"
     
     base_model_ckpt_path = './base_models/base_model.ckpt'
     base_model_ckpt_dir  = './base_models'

@@ -27,7 +27,7 @@ def run_program(params):
     if params.parse_cnn_stories:
         dataset_helper.parse_cnn_stories(params)   
     else:
-        tldr_model.train(params)
+        tldr_model.run(params)
  
 if __name__ == "__main__":
     
@@ -58,10 +58,13 @@ if __name__ == "__main__":
     parser.add_argument("--train_out_file",default="train.out",help="training summaries file")
     parser.add_argument("--test_in_file",default="test.in",help="test stories file")
     parser.add_argument("--test_out_file",default="test.out",help="test summaries file")
+    parser.add_argument("--inference_in_file",default="inference.in",help="inference stories file, valid only when inference_only is enabled")
+    parser.add_argument("--inference_out_file",default="test.inference_out",help="inference summaries file, valid only when inference_only is enabled")
     
     parser.add_argument("--inference_style",default="beam_search",help="type of inference - beam_search or greedy_search")
     parser.add_argument("--beam_width",type=int,default=10,help="beam search width or beam size")
     parser.add_argument("--lm_beam_width",type=int,default=3,help="beam search outputs for validation against the language model")
+    parser.add_argument("--mode",default="train_inference",help="options are train_inference and inference_only. If inference_only is enabled, add stories to inference.in in the format <story_id> <story>. The result will be added to inference.out in the format <story_id> <summary>")
     
     parser.add_argument("--max_display_len",type=int,default=12,help="number of words to pick when displaying summary")
     parser.add_argument("--max_summary_len",type=int,default=20,help="number of words to pick for the summary")
@@ -74,40 +77,53 @@ if __name__ == "__main__":
     # display arguments
     print("Running program with below arguments:\n")
     
-    print("\nTraining properties:")
-    print("batch size             :%d"    % args.batch_size); params.batch_size = args.batch_size
-    print("vocab size             :%d"    % args.vocab_size); params.vocab_size = args.vocab_size    
-    print("hidden units           :%d"    % args.hidden_units); params.hidden_units = args.hidden_units
-    print("embedding size         :%d"    % args.embedding_size); params.embedding_size = args.embedding_size
-    print("max grad norm          :%d"    % args.max_grad_norm); params.max_grad_norm = args.max_grad_norm
-    print("learning rate          :%0.4f" % args.learning_rate); params.learning_rate = args.learning_rate
-    print("encoder max time       :%d"    % args.encoder_max_time); params.encoder_max_time = args.encoder_max_time     
-    print("decoder max time       :%d"    % args.decoder_max_time); params.decoder_max_time = args.decoder_max_time    
-    print("keep probability       :%0.4f" % args.keep_prob); params.keep_prob = args.keep_prob  
+    params_str = ""
     
-    print("\n Inference properties:")
-    print("inference_style        :%s"    % args.inference_style); params.inference_style = args.inference_style     
-    print("beam width             :%d"    % args.beam_width); params.beam_width = args.beam_width     
-    print("lm beam width          :%d"    % args.lm_beam_width); params.lm_beam_width = args.lm_beam_width       
+    params_str += ("\nTraining properties:")
+    params_str += "\nbatch size             :%d"    % (args.batch_size); params.batch_size = args.batch_size
+    params_str += ("\nvocab size             :%d"    % args.vocab_size); params.vocab_size = args.vocab_size    
+    params_str += ("\nhidden units           :%d"    % args.hidden_units); params.hidden_units = args.hidden_units
+    params_str += ("\nembedding size         :%d"    % args.embedding_size); params.embedding_size = args.embedding_size
+    params_str += ("\nmax grad norm          :%d"    % args.max_grad_norm); params.max_grad_norm = args.max_grad_norm
+    params_str += ("\nlearning rate          :%0.4f" % args.learning_rate); params.learning_rate = args.learning_rate
+    params_str += ("\nencoder max time       :%d"    % args.encoder_max_time); params.encoder_max_time = args.encoder_max_time     
+    params_str += ("\ndecoder max time       :%d"    % args.decoder_max_time); params.decoder_max_time = args.decoder_max_time    
+    params_str += ("\nkeep probability       :%0.4f" % args.keep_prob); params.keep_prob = args.keep_prob  
     
-    print("\nEnvironment properties:")
-    print("model directory        :%s"    % args.model_dir); params.model_dir = args.model_dir
-    print("ignore checkpoints     :%s"    % args.ignore_checkpoint); params.ignore_checkpoint = args.ignore_checkpoint
-    print("data directory         :%s"    % args.data_dir); params.data_dir = args.data_dir
-    print("parse cnn stories      :%s"    % args.parse_cnn_stories); params.parse_cnn_stories = args.parse_cnn_stories
-    print("regenerate dataset     :%s"    % args.regenerate_dataset); params.regenerate_dataset = args.regenerate_dataset           
-    print("story vocab file       :%s"    % args.story_vocab_file); params.story_vocab_file = args.story_vocab_file
-    print("summary vocab file     :%s"    % args.summary_vocab_file); params.summary_vocab_file = args.summary_vocab_file
-    print("training stories file  :%s"    % args.train_in_file); params.train_in_file = args.train_in_file
-    print("training summaries file:%s"    % args.train_out_file); params.train_out_file = args.train_out_file
-    print("test stories file      :%s"    % args.test_in_file); params.test_in_file = args.test_in_file     
-    print("test summaries file    :%s"    % args.test_out_file); params.test_out_file = args.test_out_file  
+    params_str += ("\n\nInference properties:")
+    params_str += ("\ninference_style        :%s"    % args.inference_style); params.inference_style = args.inference_style     
+    params_str += ("\nbeam width             :%d"    % args.beam_width); params.beam_width = args.beam_width     
+    params_str += ("\nlm beam width          :%d"    % args.lm_beam_width); params.lm_beam_width = args.lm_beam_width       
+    params_str += ("\nmode                   :%s"    % args.mode); params.mode = args.mode    
     
-    print("\n Display properties:")
-    print("max display len        :%d"    % args.max_display_len); params.max_display_len = args.max_display_len     
-    print("max summary len        :%d"    % args.max_summary_len); params.max_summary_len = args.max_summary_len     
+    params_str += ("\n\nEnvironment properties:")
+    params_str += ("\nmodel directory        :%s"    % args.model_dir); params.model_dir = args.model_dir
+    params_str += ("\nignore checkpoints     :%s"    % args.ignore_checkpoint); params.ignore_checkpoint = args.ignore_checkpoint
+    params_str += ("\ndata directory         :%s"    % args.data_dir); params.data_dir = args.data_dir
+    params_str += ("\nparse cnn stories      :%s"    % args.parse_cnn_stories); params.parse_cnn_stories = args.parse_cnn_stories
+    params_str += ("\nregenerate dataset     :%s"    % args.regenerate_dataset); params.regenerate_dataset = args.regenerate_dataset           
+    params_str += ("\nstory vocab file       :%s"    % args.story_vocab_file); params.story_vocab_file = args.story_vocab_file
+    params_str += ("\nsummary vocab file     :%s"    % args.summary_vocab_file); params.summary_vocab_file = args.summary_vocab_file
+    params_str += ("\ntraining stories file  :%s"    % args.train_in_file); params.train_in_file = args.train_in_file
+    params_str += ("\ntraining summaries file:%s"    % args.train_out_file); params.train_out_file = args.train_out_file
+    params_str += ("\ntest stories file      :%s"    % args.test_in_file); params.test_in_file = args.test_in_file     
+    params_str += ("\ntest summaries file    :%s"    % args.test_out_file); params.test_out_file = args.test_out_file  
+    params_str += ("\ninference input file   :%s"    % args.inference_in_file); params.inference_in_file = args.inference_in_file
+    params_str += ("\ninference out file     :%s"    % args.inference_out_file); params.inference_out_file = args.inference_out_file 
+    params_str += ("\n\nDisplay properties:")
+    params_str += ("\nmax display len        :%d"    % args.max_display_len); params.max_display_len = args.max_display_len     
+    params_str += ("\nmax summary len        :%d"    % args.max_summary_len); params.max_summary_len = args.max_summary_len     
 
-    print("#"*80)
+    params_str += "\n"
+    params_str += ("#"*80)
+    params_str += "\n"
+    
+    # display params
+    print(params_str)
+    
+    # write params to file
+    print("Writing model params to :",params.params_file)
+    open(params.params_file,"w").write(params_str)
     
     # Run program
     run_program(params)

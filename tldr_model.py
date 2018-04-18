@@ -19,9 +19,21 @@ import pickle
 import os
 import time
 import shutil
+import sys
 
 import utils
 import batch_helper
+
+# following a file - See https://stackoverflow.com/questions/5419888/reading-from-a-frequently-updated-file
+def follow(thefile):
+    thefile.seek(0,2)
+    while True:
+        line = thefile.readline()
+        if not line:
+            time.sleep(0.1)
+            continue
+        yield line
+
 
 def display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds):
     
@@ -75,16 +87,47 @@ def display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_v
     test_pred_ids = test_preds[sample_id]
 
     #print("test_preds:\n",test_preds)
-    test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]                                                    
-    print("Test. New Summary:"," ".join(test_summary[:
-                params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)]))  
+    test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]        
+    test_summary = " ".join(test_summary[:
+                params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)])
+    print("Test. New Summary:",test_summary)  
 
     print("-"*80)   
     
     # dump stats for rouge computation
     dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds)
     
+    return test_summary
+    
+# display all possible summaries using beam search
+def getBestSummary(sample_id,predicted_ids,params,display=True):
 
+    possible_summaries = []
+    possible_summaries_indices = []
+    lm_eval_count = params.lm_beam_width if predicted_ids.shape[1] > params.lm_beam_width else predicted_ids.shape[1]
+    for i in range(0,lm_eval_count):
+
+        test_pred_ids = predicted_ids[sample_id][i]
+
+        test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]    
+        summary = " ".join(test_summary[:
+                    params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)])
+
+        if display == True:
+            print("Test. New Summary:%d:%s" % (i,summary))
+
+        # add to set of possible summaries 
+        possible_summaries.append(summary)
+        possible_summaries_indices.append(test_pred_ids)
+
+    # find the best summary using the n-gram language model
+    best_summary, best_summary_index = params.lts.getBest(possible_summaries)
+
+    if display == True:
+        print("Best Summary:",best_summary)
+
+    return best_summary, possible_summaries_indices[best_summary_index]
+    
 def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds):
     
     # extract data from train and test batches for display
@@ -96,15 +139,16 @@ def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_
         test_raw_dec_in_batch,test_dec_in_batch,test_dec_in_batch_len,
         test_raw_dec_out_batch,test_dec_out_batch,test_dec_out_batch_len) = test_batch
     
-    # length of output story and summary                    
-    sample_id = np.random.randint(0,params.batch_size)
+    # length of output story and summary         
+    if params.mode == "inference_only":
+        sample_id = 0 # there is only one story in the batch if we are doing inference only
+    else:
+        sample_id = np.random.randint(0,params.batch_size)
 
     # displaying training results
     print("Epoch:%d,Completed Batches:%d, Loss:%0.4f" % (epoch_index,batches_count,loss_value))
     print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len]))
     print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len]))
-
-    #print("type(train_preds):%s,train_preds.shape:%s" % (type(train_preds),train_preds.shape))
 
     train_preds = np.transpose(train_preds)
     train_pred_ids = train_preds[sample_id]
@@ -121,55 +165,32 @@ def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_
     #print("test_preds.shape - before reshaping:",predicted_ids.shape)
     predicted_ids = np.reshape(predicted_ids,(predicted_ids.shape[1],predicted_ids.shape[2],predicted_ids.shape[0]))
     
-    #print("type(test_preds):",type(predicted_ids))
-    #print("test_preds:\n",predicted_ids)
-    #print("test_preds.shape:",predicted_ids.shape)
-    
     if len(test_raw_enc_in_batch) < sample_id:
         print("len(test_raw_enc_in_batch) < sample_id...resetting sample_id to 0")
         print("test_raw_enc_in_batch:\n",test_raw_enc_in_batch)
         sample_id = 0
 
-    #print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
     print("\nTest. Story       :"," ".join(test_raw_enc_in_batch[sample_id][:
                         params.max_display_len if len(test_raw_enc_in_batch[sample_id]) > params.max_display_len else len(test_raw_enc_in_batch[sample_id])]))
     print("Test. Original Summary:", " ".join(test_raw_dec_in_batch[sample_id][:params.max_display_len if len(test_raw_dec_in_batch[sample_id])>params.max_display_len else len(test_raw_dec_in_batch[sample_id])]))  
-
-    #print("type(test_preds):%s,len(test_preds):%d" % (type(test_preds),len(test_preds)))
-    #print("test_preds:\n",test_preds)
     
-    # display all possible summaries using beam search
-    possible_summaries = []
-    lm_eval_count = params.lm_beam_width if predicted_ids.shape[1] > params.lm_beam_width else predicted_ids.shape[1]
-    for i in range(0,lm_eval_count):
-        
-        test_pred_ids = predicted_ids[sample_id][i]
-
-        #test_preds = test_preds[0]
-
-        #print("type(test_preds):%s,test_preds.shape:%s" % (type(test_preds),test_preds.shape))
-
-        #test_preds = np.transpose(test_preds)
-        #test_pred_ids = test_preds[sample_id]
-
-        #print("test_preds:\n",test_preds)
-        test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]    
-        summary = " ".join(test_summary[:
-                    params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)])
-        print("Test. New Summary:%d:%s" % (i,summary))
-        
-        # add to set of possible summaries 
-        possible_summaries.append(summary)
-        
-    # find the best summary using the n-gram language model
-    best_summary = params.lts.getBest(possible_summaries)
-    
-    print("Best Summary:",best_summary)
+   
+    # get the display the best summary
+    getBestSummary(sample_id, predicted_ids,params)
 
     print("-"*80)   
     
-    # dump stats for rouge computation
-    dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds)
+    # dump stats for rouge computation 
+    if params.mode == "train_inference":
+        test_preds = []
+        
+        for i in range(len(test_raw_enc_in_batch)):
+            
+            best_summary, best_summary_indices = getBestSummary(i, predicted_ids, params,display = False)
+            
+            test_preds.append(best_summary_indices)
+        
+        dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds)
     
 def dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds):
     
@@ -592,15 +613,105 @@ def train_loop(params):
 
                 # update tensorboard summary
                 summary_writer.add_summary(summary,total_batches)
+              
+def test_loop(params):
+
+    ## training and validation
+    debug = False
+
+    with tf.Session() as sess:
+
+        # initialize global variables
+        sess.run(tf.global_variables_initializer())
+            
+        # restore/backup from/to existing checkpoints
+        print("Checkpoint path:%s" % params.ckpt_path)
+        
+        # saver for checkpointing model
+        saver = tf.train.Saver(max_to_keep=4)
+            
+        # restore model if exists
+        if params.ignore_checkpoint != True:
+            try:
+                saver.restore(sess,params.ckpt_path)
+                print("Session restored from checkpoint:",params.ckpt_path)
+            except Exception as exp: 
+                print("Unable to restore from checkpoint. No checkpoint files found")
+                pass
+        else:
+            print("ignore_checkpoint enabled. Unable to restore model. Aborting")
+            sys.exit()
+
+        # single inference loop - read contents off a file and do inference
+        inference_file = open(params.inference_in_file,"r")
+        test_stories = follow(inference_file)
+        
+        for test_story in test_stories:
+
+            # encode story
+            test_story_clean = [w if w in params.story_dicts[0].keys() else params.unknown_token  for w in test_story.split()]
+            
+            print("test story:",test_story[:20])
+            print("clean test story:",test_story_clean[:20])
+            
+            test_story_ids = [params.story_dicts[0][x] for x in test_story_clean]
+            print("test_story_ids:",test_story_ids[:20])  
+            
+            # create inputs
+            inputs  = np.full((params.encoder_max_time, params.batch_size),0,dtype=np.int32)
+            lengths = np.full((params.batch_size),0,dtype=np.int32) 
+            
+            story_length = params.encoder_max_time if len(test_story_ids) > params.encoder_max_time else len(test_story_ids)
+            inputs[:,0] = test_story_ids[:story_length] + [params.pad_token_index]*(params.encoder_max_time-story_length)
+            lengths[0] = story_length                 
+
+            # update feed inputs
+            feed_dict_test = {
+                params.encoder_inputs: inputs,
+                params.source_sequence_length: lengths
+            }
+
+            # testing
+            test_preds = sess.run([params.test_predictions], feed_dict=feed_dict_test)
+
+            if params.inference_style == "greedy_search":
+                test_preds = np.transpose(test_preds)
+                test_pred_ids = test_preds[sample_id]
+
+                #print("test_preds:\n",test_preds)
+                test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]        
+                test_summary = " ".join(test_summary[:
+                            params.max_display_len if len(test_summary)>params.max_display_len else len(test_summary)])
+
+            else:
+                predicted_ids = test_preds[0].predicted_ids
+                #print("test_preds.shape - before reshaping:",predicted_ids.shape)
+                predicted_ids = np.reshape(predicted_ids,(predicted_ids.shape[1],predicted_ids.shape[2],predicted_ids.shape[0]))
+
+                # get the display the best summary - use sample_id = 0, since there is only one entry
+                test_summary, _ = getBestSummary(0, predicted_ids,params)   
+            
+            print("Test. New Summary:",test_summary)  
+
                 
-def train(params):
+def run(params):
     
     # load dataset 
     initialize_data(params)
+    
+    if params.mode == "inference_only":
+        # force batch_size to 1 for inference
+        params.batch_size = 1
     
     # create the tensorflow graph
     create_model(params)
     
     # run the training loop with intermediate validation
-    train_loop(params)
+    if params.mode == "train_inference":
+        train_loop(params)
+    elif params.mode == "inference_only":
+        test_loop(params)
+    else:
+        print("Unrecognized mode. Aborting...")
+        sys.exit()
     
