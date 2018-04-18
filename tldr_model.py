@@ -648,6 +648,8 @@ def test_loop(params):
         
         for line in test_stories:
             
+            print("Received line for inference:",line)
+            
             # format of line is transaction_id,test_story
             transaction_id,test_story = line.split(",")
 
@@ -698,7 +700,7 @@ def test_loop(params):
             
             # write this out to the inference output file
             with open(params.inference_out_file,"a+") as out_file:
-                out_file.write("\n" + transaction_id + "," + test_summary)
+                out_file.write(transaction_id + "," + test_summary + "\n")
 
                 
 def run(params):
