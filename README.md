@@ -47,6 +47,18 @@ If inference_only is enabled, add stories to inference.in in the format <transac
 
 All models are checkpointed so you should not have to restart training from the beginning. Note that previous models get saved in a separate folder, so they may accumalate and take up space. Make sure to delete those folders in that case.
 
+### UI client/server for interacting with the inference engine
+
+When the inference engine is running, you can also launch a simple web-based UI built using Apache Flask
+
+In order to launch the UI, you need to run the below command.
+
+ python app/inference_srv.py
+ 
+ You should then be able to got to http://<your host>:5000 and enter stories and look at generated summaries there.
+  
+ A version of this app is running here - http://tldr.ddnsfree.com/
+
 #### Below are defaults used by the model. They can be changed using the syntax below
 
 ```
