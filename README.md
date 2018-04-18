@@ -180,7 +180,8 @@ optional arguments:
   #### Features
   
   1. RNN/LSTM based sequence to sequence network
-  2. General utility/debugging features - tensorboard, model persistence
+  2. Independent training and inference modes.
+  3. General utility/debugging features - tensorboard, model persistence
   
   #### Models
   
