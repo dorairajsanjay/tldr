@@ -1,5 +1,5 @@
 import feedparser
-from flask import Flask
+from flask import Flask, url_for
 from flask import render_template
 from flask import request
 import numpy as np
@@ -56,8 +56,12 @@ def get_summary(story):
 
 @app.route("/")
 def get_news():
-        story = request.args.get("story")
 
+        background_image = "blank-business-close-up-1007025.jpg"
+        background_url = url_for('static', filename='blank-business-close-up-1007025.jpg')
+        
+        story = request.args.get("story")
+        
         summary = "Nothing here yet...please enter and submit some text and then something should show up..."
         if story != None:
             print("Processing story:",story)
@@ -72,7 +76,7 @@ def get_news():
             
             print("Summary returned from inference module:",summary)
         
-        return render_template("home_form.html",summary=summary,story=story)
+        return render_template("home_form.html",summary=summary,story=story,background_url=background_url)
     
 if __name__ == "__main__":
-    app.run(host="0.0.0.0",port=5000, debug=True)
+    app.run(host="0.0.0.0",port=80, debug=True)
