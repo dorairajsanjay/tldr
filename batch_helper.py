@@ -58,6 +58,9 @@ def getBatch(params,max_time,dataset,vocab_dict,batch_type,training=True,debug=F
         elif batch_type == "decoder_output":
             sequence[word_count-1] = vocab_dict[params.sentence_end]
             word_end= word_count-1
+        elif batch_type == "encoder_input":
+            sequence[word_count-1] = vocab_dict[params.sentence_end]
+            word_end = word_count - 1
         
         origIdx = 0
         for wordIdx in range(word_start,word_end):

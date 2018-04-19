@@ -75,7 +75,7 @@ class ModelParams(object):
     
     # max summary to generate
     max_summary_length = 20
-    max_display_len = 12
+    max_display_len = 300
     
     # for dropout
     keep_prob = 0.8

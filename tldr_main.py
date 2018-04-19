@@ -66,7 +66,7 @@ if __name__ == "__main__":
     parser.add_argument("--lm_beam_width",type=int,default=3,help="beam search outputs for validation against the language model")
     parser.add_argument("--mode",default="train_inference",help="options are train_inference and inference_only. If inference_only is enabled, add stories to inference.in in the format <story_id> <story>. The result will be added to inference.out in the format <story_id> <summary>")
     
-    parser.add_argument("--max_display_len",type=int,default=12,help="number of words to pick when displaying summary")
+    parser.add_argument("--max_display_len",type=int,default=300,help="number of words to pick when displaying summary")
     parser.add_argument("--max_summary_len",type=int,default=20,help="number of words to pick for the summary")
     parser.add_argument("--encoder_max_time",type=int,default=300,help="number of steps to unroll for the encoder")
     parser.add_argument("--decoder_max_time",type=int,default=20,help="number of steps to unroll for the summary")

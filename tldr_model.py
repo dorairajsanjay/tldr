@@ -51,8 +51,8 @@ def display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_v
 
     # displaying training results
     print("Epoch:%d,Completed Batches:%d, Loss:%0.4f" % (epoch_index,batches_count,loss_value))
-    print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len]))
-    print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len]))
+    print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len if len(raw_enc_in_batch)<params.max_display_len else len(raw_enc_in_batch)]))
+    print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len if len(raw_dec_in_batch)<params.max_display_len else len(raw_dec_in_batch)]))
 
     #print("type(train_preds):%s,train_preds.shape:%s" % (type(train_preds),train_preds.shape))
 
@@ -147,8 +147,8 @@ def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_
 
     # displaying training results
     print("Epoch:%d,Completed Batches:%d, Loss:%0.4f" % (epoch_index,batches_count,loss_value))
-    print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len]))
-    print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len]))
+    print("Train. Story       :"," ".join(raw_enc_in_batch[sample_id][:params.max_display_len if len(raw_enc_in_batch)<params.max_display_len else len(raw_enc_in_batch)]))
+    print("Train. Orig Summary:", " ".join(raw_dec_in_batch[sample_id][:params.max_display_len if len(raw_dec_in_batch)<params.max_display_len else len(raw_dec_in_batch)]))
 
     train_preds = np.transpose(train_preds)
     train_pred_ids = train_preds[sample_id]
@@ -257,7 +257,7 @@ def create_model(params):
     params.emb_init = tf.truncated_normal_initializer(mean=0.0, stddev=0.01)
 
     # Encoder
-    with tf.variable_scope('encoder_lstm_cell'):
+    with tf.variable_scope('encoder_lstm_cell',reuse=tf.AUTO_REUSE):
 
         params.encoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="encoder_lstm_cell")
         params.encoder_cell = tf.nn.rnn_cell.DropoutWrapper(params.encoder_cell,
@@ -283,13 +283,13 @@ def create_model(params):
                                                         )
 
     ## Decoder Embedding matrix
-    with tf.variable_scope('decoder_embeddings'):
+    with tf.variable_scope('decoder_embeddings',reuse=tf.AUTO_REUSE):
             params.decoder_emb = tf.get_variable(
                 "embedding_decoder", [params.final_vocab_size, params.embedding_size],
                 initializer=params.emb_init)
 
     # Build RNN Cell
-    with tf.variable_scope('train_decoder'):
+    with tf.variable_scope('train_decoder',reuse=tf.AUTO_REUSE):
 
         # embedding lookup
         params.decoder_emb_inp = tf.nn.embedding_lookup(params.decoder_emb, params.decoder_inputs)
@@ -340,7 +340,7 @@ def create_model(params):
 
     ## Inference Decoder
 
-    with tf.variable_scope('test_decoder'):
+    with tf.variable_scope('test_decoder',reuse=tf.AUTO_REUSE):
         
         # basic LSTM decoder cell
         params.test_decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="test_decoder_lstm_cell")
@@ -353,22 +353,27 @@ def create_model(params):
         if params.inference_style == "greedy_search":
 
             params.test_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
-                      num_units=params.hidden_units, 
-                      memory = tf.transpose(params.encoder_outputs, [1, 0, 2]),
-                      memory_sequence_length=params.source_sequence_length,
-                      normalize = True
-            )
+                                                      num_units=params.hidden_units, 
+                                                      memory = tf.transpose(params.encoder_outputs, perm=[1, 0, 2]),
+                                                      memory_sequence_length=params.source_sequence_length
+                                                     # normalize = True
+                                                     )
     
             params.test_decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
-                    params.test_decoder_cell , params.test_attention_mechanism, 
-                        alignment_history=True, attention_layer_size=params.hidden_units)
+                                                    params.test_decoder_cell , 
+                                                    params.test_attention_mechanism, 
+                                                    alignment_history=True, 
+                                                    attention_layer_size=params.hidden_units,
+                                                    output_attention=False)
 
             # add projection layer
-            params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size)            
+            params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size)
+            params.test_decoder_cell = params.train_decoder_cell
+            
             params.test_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
                                                       params.decoder_emb,
-                                                      params.start_tokens,
-                                                      params.sentence_end_index)
+                                                      start_tokens=tf.fill([params.batch_size], params.sentence_start_index),
+                                                      end_token=params.sentence_end_index)
 
             # Decoder
             initial_state = params.test_decoder_cell.zero_state(params.batch_size, params.dtype).clone(
@@ -395,7 +400,8 @@ def create_model(params):
             params.test_logits = params.test_output_states.rnn_output
 
             # predictions = [batch x seq_len]
-            params.test_predictions = tf.identity(params.test_output_states.sample_id)
+            #params.test_predictions = tf.identity(params.test_output_states.sample_id)
+            params.test_predictions = params.test_output_states.sample_id
             
         elif params.inference_style == "beam_search":
             
