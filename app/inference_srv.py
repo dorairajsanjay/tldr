@@ -58,7 +58,7 @@ def get_summary(story):
 def get_news():
 
         background_image = "blank-business-close-up-1007025.jpg"
-        background_url = url_for('static', filename='blank-business-close-up-1007025.jpg')
+        background_url = url_for('static', filename='blank-business-close-up-1007025_2.jpg')
         
         story = request.args.get("story")
         
@@ -75,6 +75,9 @@ def get_news():
             summary = get_summary(clean_story)
             
             print("Summary returned from inference module:",summary)
+
+        else:
+            story = ""
         
         return render_template("home_form.html",summary=summary,story=story,background_url=background_url)
     

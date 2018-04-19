@@ -571,7 +571,7 @@ def train_loop(params):
                     params.decoder_targets:dec_out_batch,
                     params.source_sequence_length: enc_in_batch_len,
                     params.target_sequence_length: dec_out_batch_len
-                }
+                } 
 
                 # training
                 _, loss_value, summary, train_preds = sess.run([params.update_step, params.train_loss, merged_summary_op,params.train_predictions], feed_dict=feed_dict_train)
@@ -590,6 +590,10 @@ def train_loop(params):
                     params.encoder_inputs: test_enc_in_batch,
                     params.source_sequence_length: test_enc_in_batch_len
                 }
+                
+                #print("params.batch_size:",params.batch_size)
+                #print("test_enc_in_batch:",test_enc_in_batch)
+                #print("test_enc_in_batch_len:",test_enc_in_batch_len)
                 
                 # testing
                 test_preds = sess.run([params.test_predictions], feed_dict=feed_dict_test)
@@ -652,15 +656,17 @@ def test_loop(params):
             
             # format of line is transaction_id,test_story
             transaction_id,test_story = line.split(",")
+            
+            test_story = test_story.split()
 
             # encode story
-            test_story_clean = [w if w in params.story_dicts[0].keys() else params.unknown_token  for w in test_story.split()]
+            test_story_clean = [w if w in params.story_dicts[0].keys() else params.unknown_token  for w in test_story]
             
-            print("test story:",test_story[:20])
-            print("clean test story:",test_story_clean[:20])
+            #print("test story:",test_story[:20])
+            #print("clean test story:",test_story_clean[:20])
             
             test_story_ids = [params.story_dicts[0][x] for x in test_story_clean]
-            print("test_story_ids:",test_story_ids[:20])  
+            #print("test_story_ids:",test_story_ids[:20])  
             
             # create inputs
             inputs  = np.full((params.encoder_max_time, params.batch_size),0,dtype=np.int32)
@@ -675,13 +681,25 @@ def test_loop(params):
                 params.encoder_inputs: inputs,
                 params.source_sequence_length: lengths
             }
+            
+            #print("inputs:",inputs)
+            #print("lengths:",lengths)
 
             # testing
             test_preds = sess.run([params.test_predictions], feed_dict=feed_dict_test)
 
             if params.inference_style == "greedy_search":
+                
+                sample_id = np.random.randint(0,params.batch_size)
+                #print("test_preds prior to transpose",test_preds)
                 test_preds = np.transpose(test_preds)
+                
                 test_pred_ids = test_preds[sample_id]
+                #print("test_preds",test_preds)
+                #print("test_pred_ids:",test_pred_ids)
+                
+                test_pred_ids = np.array(test_preds).flatten()
+                #print("test_pred_ids - after flattening:",test_pred_ids)
 
                 #print("test_preds:\n",test_preds)
                 test_summary = [params.summary_dicts[1][x] for x in test_pred_ids]        

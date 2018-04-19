@@ -3,13 +3,16 @@
         <title>tl;dr - An Experimental Text Summarizer</title>
     </head>
     <body>
-        <body background={{background_url}}>
+        <body background={{background_url}} style='width:100%;height:100%'>
         <h1>tl;dr - an experimental text summarizer</h1>
         <form>
-          <textarea name="story" rows="30" cols="120">
+          <textarea name="story" rows="30" cols="160" value="">
 		  {{story}}
 		  </textarea>
-          <input type="submit" value="Submit" />
+          <br>
+          <!--<input type="submit" value="Submit" width="160" height="50"/>-->
+		  <input type="submit"  value="Summarize" style="font-size:12pt;color:white;
+background-color:green;border:2px solid #336600;padding:3px;">
         </form>
 	    <h2>Summary</h2>
 		<p>{{summary}}</p>
