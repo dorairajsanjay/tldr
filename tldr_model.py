@@ -310,7 +310,7 @@ def create_model(params):
                     alignment_history=True, attention_layer_size=params.hidden_units)
 
         # add projection layer
-        params.train_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.train_attn_cell,params.final_vocab_size)
+        params.train_decoder_cell_attn = tf.contrib.rnn.OutputProjectionWrapper(params.train_attn_cell,params.final_vocab_size)
 
         # Helper
         params.train_helper = tf.contrib.seq2seq.TrainingHelper(
@@ -319,10 +319,10 @@ def create_model(params):
                                         time_major=True)
 
         # Decoder
-        initial_state = params.train_decoder_cell.zero_state(params.batch_size, params.dtype).clone(
+        initial_state = params.train_decoder_cell_attn.zero_state(params.batch_size, params.dtype).clone(
                                                                           cell_state=params.encoder_state)
         params.train_decoder = tf.contrib.seq2seq.BasicDecoder(
-                                cell = params.train_decoder_cell, 
+                                cell = params.train_decoder_cell_attn, 
                                 helper = params.train_helper, 
                                 #initial_state=params.train_decoder_cell.zero_state(
                                 #    dtype=tf.float32, batch_size=params.batch_size))
@@ -368,7 +368,7 @@ def create_model(params):
 
             # add projection layer
             params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size)
-            params.test_decoder_cell = params.train_decoder_cell
+            params.test_decoder_cell = params.train_decoder_cell_attn
             
             params.test_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
                                                       params.decoder_emb,
@@ -411,6 +411,8 @@ def create_model(params):
             # and https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/seq2seq/python/kernel_tests/beam_search_decoder_test.py
             # and https://github.com/tensorflow/tensorflow/issues/13154 (Note that alignment history was disabled since it was not supported in BeamSearchDecoder
             
+            params.test_decoder_cell = params.train_decoder_cell
+            
             initial_state = params.test_decoder_cell.zero_state(params.batch_size,params.dtype)
             
             encoder_outputs_t = tf.transpose(params.encoder_outputs, [1, 0, 2])
@@ -430,6 +432,7 @@ def create_model(params):
             
             initial_state = tf.contrib.seq2seq.tile_batch(initial_state,multiplier=params.beam_width)    
             
+            params.test_decoder_cell = params.train_decoder_cell
             params.test_decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
                                                 params.test_decoder_cell , 
                                                 params.test_attention_mechanism, 
