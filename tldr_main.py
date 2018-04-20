@@ -101,8 +101,8 @@ if __name__ == "__main__":
     params_str += ("\nmode                   :%s"    % args.mode); params.mode = args.mode    
     
     params_str += ("\n\nEnvironment properties:")
-    params_str += ("\nmodel directory        :%s"    % args.model_dir); params.model_dir = args.model_dir
-    params_str += ("\nlog directory        :%s"      % args.log_dir); params.log_dir = args.log_dir
+    params_str += ("\nmodel directory        :%s"    % args.models_dir); params.models_dir = args.models_dir
+    params_str += ("\nlog directory          :%s"    % args.logs_dir); params.logs_dir = args.logs_dir
     params_str += ("\nignore checkpoints     :%s"    % args.ignore_checkpoint); params.ignore_checkpoint = args.ignore_checkpoint
     params_str += ("\ndata directory         :%s"    % args.data_dir); params.data_dir = args.data_dir
     params_str += ("\nparse cnn stories      :%s"    % args.parse_cnn_stories); params.parse_cnn_stories = args.parse_cnn_stories
@@ -127,10 +127,10 @@ if __name__ == "__main__":
     print(params_str)
     
     # update model path
-    params.ckpt_path = params.model_dir + "/model.ckpt"
-    params.ckpt_dir  = params.model_dir
+    params.ckpt_path = params.models_dir + "/model.ckpt"
+    params.ckpt_dir  = params.models_dir
     
-    params.log_path = params.log_dir
+    params.logs_path = params.logs_dir
     
     # write params to file
     print("Writing model params to :",params.params_file)
