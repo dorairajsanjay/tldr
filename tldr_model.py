@@ -497,10 +497,8 @@ def train_loop(params):
 
     # saver for checkpointing model
     saver = tf.train.Saver(max_to_keep=4)
-    
-    config = tf.ConfigProto(device_count = {'GPU': params.gpu_id}) 
 
-    with tf.Session(config=config) as sess:
+    with tf.Session() as sess:
 
         # initialize global variables
         sess.run(tf.global_variables_initializer())
