@@ -46,7 +46,8 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate",type=float,default=0.001,help="learning rate")
     parser.add_argument("--keep_prob",type=float,default=0.8,help="keep probability. this is (1 - the drop-out probability)")
 
-    parser.add_argument("--model_dir",default="./models_gs",help="path to saved models")
+    parser.add_argument("--model_dir",default="./models",help="path to saved models")
+    parser.add_argument("--log_dir",default="./logs",help="path to logs, including tensorboard logs")
     parser.add_argument("--ignore_checkpoint", action='store_true',help="ignore existing checkpoints for restore")
 
     parser.add_argument("--data_dir",default="./data",help="path to data")
@@ -101,6 +102,7 @@ if __name__ == "__main__":
     
     params_str += ("\n\nEnvironment properties:")
     params_str += ("\nmodel directory        :%s"    % args.model_dir); params.model_dir = args.model_dir
+    params_str += ("\nlog directory        :%s"      % args.log_dir); params.log_dir = args.log_dir
     params_str += ("\nignore checkpoints     :%s"    % args.ignore_checkpoint); params.ignore_checkpoint = args.ignore_checkpoint
     params_str += ("\ndata directory         :%s"    % args.data_dir); params.data_dir = args.data_dir
     params_str += ("\nparse cnn stories      :%s"    % args.parse_cnn_stories); params.parse_cnn_stories = args.parse_cnn_stories
@@ -127,6 +129,8 @@ if __name__ == "__main__":
     # update model path
     params.ckpt_path = params.model_dir + "/model.ckpt"
     params.ckpt_dir  = params.model_dir
+    
+    params.log_path = parms.log_dir
     
     # write params to file
     print("Writing model params to :",params.params_file)

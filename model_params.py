@@ -103,7 +103,7 @@ class ModelParams(object):
     
     base_model_ckpt_path = './base_models/base_model.ckpt'
     base_model_ckpt_dir  = './base_models'
-    
+
     rouge_evaluation_dir = "./rouge"
     
     # learned tensorflow variables
