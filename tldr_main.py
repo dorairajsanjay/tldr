@@ -46,7 +46,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate",type=float,default=0.001,help="learning rate")
     parser.add_argument("--keep_prob",type=float,default=0.8,help="keep probability. this is (1 - the drop-out probability)")
 
-    parser.add_argument("--model_dir",default="./models",help="path to saved models")
+    parser.add_argument("--models_dir",default="./models",help="path to saved models")
     parser.add_argument("--logs_dir",default="./logs",help="path to logs, including tensorboard logs")
     parser.add_argument("--ignore_checkpoint", action='store_true',help="ignore existing checkpoints for restore")
 
