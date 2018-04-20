@@ -405,7 +405,6 @@ def create_model(params):
                                                       decoder_emb,
                                                       start_tokens=start_tokens,
                                                       end_token=params.sentence_end_index)
-                                              cell_state=decoder_initial_state)
             
             test_decoder = tf.contrib.seq2seq.BasicDecoder(
                                     cell = test_decoder_cell, 
