@@ -193,7 +193,6 @@ def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_
         dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds)
     
 def dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds):
-
     
     if len(test_raw_dec_in_batch) != len(test_preds):
         print("Reference/Hypothesis count mismatch.len(test_raw_dec_in_batch):%d, len(test_preds):%d" % (len(test_raw_dec_in_batch),len(test_preds)))
@@ -214,9 +213,6 @@ def dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds):
         
         hyp_file.write(hypothesis + "\n")
         ref_file.write(reference + "\n")
-        
-        #print("hypothesis:",hypothesis)
-        #print("reference:",reference)
         
     hyp_file.close()
     ref_file.close()
@@ -239,6 +235,67 @@ def initialize_data(params):
         # Restore dataset from pickle files
         print("Restoring train and test datasets")
         utils.restore_train_and_test_datasets(params)
+        
+def create_decoder_cell(params,mode):
+    
+    encoder_outputs_final = tf.transpose(params.encoder_outputs, [1, 0, 2])
+    memory_sequence_length = params.source_sequence_length
+    encoder_state_final = params.encoder_state
+    batch_size_final = params.batch_size
+    alignment_history = True
+   
+    if mode == "inference":
+        
+        print("create decoder cell: inference")
+            
+        if params.inference_style == "beam_search":
+           
+            print("create_decoder_cell: beam_search and mode: inference")
+            
+            # extend to support beam search
+            encoder_outputs_final = tf.transpose(params.encoder_outputs, [1, 0, 2])
+            encoder_outputs_final = tf.contrib.seq2seq.tile_batch(
+                                        encoder_outputs, multiplier=params.beam_width)
+            
+            encoder_state_final = tf.contrib.seq2seq.tile_batch(
+                                        params.encoder_state, multiplier=params.beam_width)
+            memory_sequence_length = tf.contrib.seq2seq.tile_batch(
+                                        params.source_sequence_length, multiplier=params.beam_width)
+            
+            # scale up batch_size beam_width times
+            batch_size_final = params.batch_size * params.beam_width
+            
+            # set alignment to False for beam search with attention
+            alignment_history = False
+    
+    # create attention mechanism
+    print("debug 1:",params.hidden_units,encoder_outputs_final,memory_sequence_length)
+    
+    train_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+      num_units=params.hidden_units, 
+      memory = encoder_outputs_final,
+      memory_sequence_length=memory_sequence_length,
+      normalize = True)
+
+    # basic LSTM decoder cell
+    decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units)
+
+    # create attention wrapper around decoder cell
+    decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
+                                                decoder_cell , 
+                                                train_attention_mechanism, 
+                                                alignment_history=alignment_history,
+                                                attention_layer_size=params.hidden_units)
+
+    # add projection layer
+    decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(decoder_cell,params.final_vocab_size)
+
+    # determine initial decoder state
+    decoder_initial_state = decoder_cell.zero_state(batch_size_final, params.dtype).clone(
+                                                                      cell_state=encoder_state_final)
+
+    return decoder_cell,decoder_initial_state,
+
 
 def create_model(params):
 
@@ -288,124 +345,87 @@ def create_model(params):
 
     ## Decoder Embedding matrix
     with tf.variable_scope('decoder_embeddings',reuse=tf.AUTO_REUSE):
-            params.decoder_emb = tf.get_variable(
+            decoder_emb = tf.get_variable(
                 "embedding_decoder", [params.final_vocab_size, params.embedding_size],
                 initializer=params.emb_init)
 
-    # Build RNN Cell
-    with tf.variable_scope('train_decoder',reuse=tf.AUTO_REUSE):
-
+    # Build Decoder
+    with tf.variable_scope('decoder',reuse=tf.AUTO_REUSE):
+        
+        ##### ##### ##### ##### ##### 
+        ##### training decoder ######
+        ##### ##### ##### ##### ##### 
+        
         # embedding lookup
-        params.decoder_emb_inp = tf.nn.embedding_lookup(params.decoder_emb, params.decoder_inputs)
+        decoder_emb_inp = tf.nn.embedding_lookup(decoder_emb, params.decoder_inputs)
         
-        params.train_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
-                  num_units=params.hidden_units, 
-                  #memory = tf.reshape(params.encoder_outputs,[params.batch_size,params.encoder_max_time,params.hidden_units]),
-                  memory = tf.transpose(params.encoder_outputs, [1, 0, 2]),
-                  memory_sequence_length=params.source_sequence_length,
-                  normalize = True
-        )
-
-        # basic LSTM decoder cell
-        params.train_decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="train_decoder_lstm_cell")
-        
-        params.train_attn_cell = tf.contrib.seq2seq.AttentionWrapper(
-                params.train_decoder_cell , params.train_attention_mechanism, 
-                    alignment_history=True, attention_layer_size=params.hidden_units)
-
-        # add projection layer
-        params.train_decoder_cell_attn = tf.contrib.rnn.OutputProjectionWrapper(params.train_attn_cell,params.final_vocab_size)
+        ## CALL create_decoder_cell here
+        train_decoder_cell,decoder_initial_state = create_decoder_cell(params,"training")
 
         # Helper
-        params.train_helper = tf.contrib.seq2seq.TrainingHelper(
-                                        params.decoder_emb_inp,
-                                        params.target_sequence_length, 
+        train_helper = tf.contrib.seq2seq.TrainingHelper(
+                                        decoder_emb_inp,
+                                        params.target_sequence_length,
                                         time_major=True)
 
-        # Decoder
-        initial_state = params.train_decoder_cell_attn.zero_state(params.batch_size, params.dtype).clone(
-                                                                          cell_state=params.encoder_state)
-        params.train_decoder = tf.contrib.seq2seq.BasicDecoder(
-                                cell = params.train_decoder_cell_attn, 
-                                helper = params.train_helper, 
-                                #initial_state=params.train_decoder_cell.zero_state(
-                                #    dtype=tf.float32, batch_size=params.batch_size))
-                                initial_state = initial_state)
+        # create decoder
+        train_decoder = tf.contrib.seq2seq.BasicDecoder(
+                                cell = train_decoder_cell, 
+                                helper = train_helper, 
+                                initial_state = decoder_initial_state)
 
         # Dynamic decoding
-        params.train_output_states,params.train_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
-                                                                    params.train_decoder,
+        train_output_states,train_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
+                                                                    train_decoder,
                                                                     output_time_major = True)
         # logits = [batch x seq_len x decoder_vocabulary_size]
-        params.train_logits = params.train_output_states.rnn_output
+        train_logits = train_output_states.rnn_output
 
         # predictions = [batch x seq_len]
-        params.train_predictions = tf.identity(params.train_output_states.sample_id)
+        params.train_predictions = tf.identity(train_output_states.sample_id)
 
-    ## Inference Decoder
-
-    with tf.variable_scope('test_decoder',reuse=tf.AUTO_REUSE):
+        ##### ##### ##### ##### ##### 
+        ##### Inference decoder ######
+        ##### ##### ##### ##### ##### 
         
-        # basic LSTM decoder cell
-        params.test_decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="test_decoder_lstm_cell")
+        ## CALL create_decoder_cell here
+        test_decoder_cell,decoder_initial_state = create_decoder_cell(params,"inference")
         
-        params.start_tokens = tf.tile(tf.constant([params.sentence_start_index],  
+        # start tokens
+        #start_tokens=tf.fill([params.batch_size], params.sentence_start_index),
+        start_tokens = tf.tile(tf.constant([params.sentence_start_index],  
                            dtype=tf.int32),  
                            [params.batch_size], 
                            name='start_tokens')
-
+        
         if params.inference_style == "greedy_search":
-
-            params.test_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
-                                                      num_units=params.hidden_units, 
-                                                      memory = tf.transpose(params.encoder_outputs, perm=[1, 0, 2]),
-                                                      memory_sequence_length=params.source_sequence_length
-                                                     # normalize = True
-                                                     )
-    
-            params.test_decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
-                                                    params.test_decoder_cell , 
-                                                    params.test_attention_mechanism, 
-                                                    alignment_history=True, 
-                                                    attention_layer_size=params.hidden_units,
-                                                    output_attention=False)
-
-            # add projection layer
-            params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size)
-            params.test_decoder_cell = params.train_decoder_cell_attn
             
-            params.test_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-                                                      params.decoder_emb,
-                                                      start_tokens=tf.fill([params.batch_size], params.sentence_start_index),
+            test_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+                                                      decoder_emb,
+                                                      start_tokens=start_tokens,
                                                       end_token=params.sentence_end_index)
 
             # Decoder
-            initial_state = params.test_decoder_cell.zero_state(params.batch_size, params.dtype).clone(
-                                                                      cell_state=params.encoder_state)
-            params.test_decoder = tf.contrib.seq2seq.BasicDecoder(
-                                    cell = params.test_decoder_cell, 
-                                    helper = params.test_helper, 
-                                    #initial_state=params.test_decoder_cell.zero_state(
-                                    #    dtype=tf.float32, batch_size=params.batch_size))
-                                    initial_state = initial_state)
-
-            # Decoder
-            #params.test_decoder = tf.contrib.seq2seq.BasicDecoder(
-            #                        cell = params.test_decoder_cell, 
-            #                        helper = params.test_helper, 
-            #                        initial_state = params.encoder_state)
+            #initial_state = test_decoder_cell.zero_state(params.batch_size, params.dtype).clone(
+            #                                                          cell_state=decoder_initial_state)
+            
+            
+            test_decoder = tf.contrib.seq2seq.BasicDecoder(
+                                    cell = test_decoder_cell, 
+                                    helper = test_helper, 
+                                    initial_state = decoder_initial_state)
 
             # Dynamic decoding
-            params.test_output_states,params.test_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
-                                                                        params.test_decoder,
+            test_output_states,test_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
+                                                                        test_decoder,
                                                                         maximum_iterations=params.max_summary_length,
                                                                         output_time_major = True)
             # logits = [batch x seq_len x decoder_vocabulary_size]
-            params.test_logits = params.test_output_states.rnn_output
+            test_logits = test_output_states.rnn_output
 
             # predictions = [batch x seq_len]
             #params.test_predictions = tf.identity(params.test_output_states.sample_id)
-            params.test_predictions = params.test_output_states.sample_id
+            params.test_predictions = test_output_states.sample_id
             
         elif params.inference_style == "beam_search":
             
@@ -415,52 +435,29 @@ def create_model(params):
             # and https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/seq2seq/python/kernel_tests/beam_search_decoder_test.py
             # and https://github.com/tensorflow/tensorflow/issues/13154 (Note that alignment history was disabled since it was not supported in BeamSearchDecoder
             
-            params.test_decoder_cell = params.train_decoder_cell
+            #params.test_decoder_cell = params.train_decoder_cell_attn
             
-            initial_state = params.test_decoder_cell.zero_state(params.batch_size,params.dtype)
+            #initial_state = params.train_decoder_cell_attn.zero_state(params.batch_size,params.dtype)
+            #initial_state = tf.contrib.seq2seq.tile_batch(initial_state,multiplier=params.beam_width)    
             
-            encoder_outputs_t = tf.transpose(params.encoder_outputs, [1, 0, 2])
-            tiled_encoder_outputs = tf.contrib.seq2seq.tile_batch(
-                                        encoder_outputs_t, multiplier=params.beam_width)
-            
-            tiled_encoder_final_state = tf.contrib.seq2seq.tile_batch(
-                                        params.encoder_state, multiplier=params.beam_width)
-            tiled_sequence_length = tf.contrib.seq2seq.tile_batch(
-                                        params.source_sequence_length, multiplier=params.beam_width)
-            
-            params.test_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
-                      num_units=params.hidden_units, 
-                      memory = tiled_encoder_outputs,
-                      memory_sequence_length=tiled_sequence_length,
-                      normalize = True)            
-            
-            initial_state = tf.contrib.seq2seq.tile_batch(initial_state,multiplier=params.beam_width)    
-            
-            params.test_decoder_cell = params.train_decoder_cell
-            params.test_decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
-                                                params.test_decoder_cell , 
-                                                params.test_attention_mechanism, 
-                                                #alignment_history=True, 
-                                                attention_layer_size=params.hidden_units)
-            
-            cell_state = params.test_decoder_cell.zero_state(params.batch_size * params.beam_width,params.dtype)
-            cell_state = cell_state.clone(cell_state=initial_state)
+            #cell_state = params.test_decoder_cell.zero_state(params.batch_size * params.beam_width,params.dtype)
+            #cell_state = cell_state.clone(cell_state=initial_state)
             
             # add projection layer
-            params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size) 
+            #params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size) 
             
-            params.test_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
-                cell = params.test_decoder_cell,
-                embedding = params.decoder_emb,
-                start_tokens = params.start_tokens,
+            test_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
+                cell = test_decoder_cell,
+                embedding = decoder_emb,
+                start_tokens = start_tokens,
                 end_token = params.sentence_end_index,
-                initial_state = cell_state,
+                initial_state = decoder_initial_state,
                 beam_width = params.beam_width,
                 length_penalty_weight = 0.0)
             
             # Dynamic decoding
-            params.test_output_states,_,_ = tf.contrib.seq2seq.dynamic_decode(
-                                                                        params.test_decoder,
+            test_output_states,_,_ = tf.contrib.seq2seq.dynamic_decode(
+                                                                        test_decoder,
                                                                         impute_finished = False,
                                                                         maximum_iterations=params.max_summary_length,
                                                                         output_time_major = True)
@@ -468,31 +465,28 @@ def create_model(params):
             #params.test_predictions = params.test_output_states.sample_id
             
             # get predictions
-            params.test_predictions  = params.test_output_states
+            params.test_predictions  = test_output_states
             #params.test_predictions = tf.identity(summaries[0])
             
             # convert to [batch_size,beam_width,time] format
             #params.test_predictions = tf.cast(params.test_predictions, tf.int32)
             #params.test_predictions = tf.transpose(params.test_predictions, [1, 2, 0])
-            
-            # get the first prediction
-            #params.test_predictions = tf.identity(translations[0])
 
     # Loss
 
     #_target_sequence_length = [100]*128
-    params.weights = tf.sequence_mask(params.target_sequence_length, dtype=tf.float32)
+    weights = tf.sequence_mask(params.target_sequence_length, dtype=tf.float32)
 
-    params.sequence_loss = tf.contrib.seq2seq.sequence_loss(
-                                    params.train_logits,
+    sequence_loss = tf.contrib.seq2seq.sequence_loss(
+                                    train_logits,
                                     params.decoder_targets,
-                                    params.weights,
+                                    weights,
                                     average_across_timesteps=False,
                                     average_across_batch=False)
 
     # I might have to divide by batch size to make the loss invariant to batch size 
     # See https://www.tensorflow.org/tutorials/seq2seq
-    params.train_loss = tf.reduce_mean(params.sequence_loss)
+    params.train_loss = tf.reduce_mean(sequence_loss)
 
     # Gradient computation and optimization
     # gradient computation
@@ -590,12 +584,8 @@ def train_loop(params):
                 _, loss_value, summary, train_preds = sess.run([params.update_step, params.train_loss, merged_summary_op,params.train_predictions], feed_dict=feed_dict_train)
                 
                 # focus on just the first batch for now
-            
+                params.test_batch_index = 0
                 test_batch = batch_helper.getNextBatch(params,params.test_in_dataset,params.test_out_dataset,training=False)
-                #if test_batch == None:
-                #    # loop around
-                #    params.test_batch_index  = 0
-                #    test_batch = batch_helper.getNextBatch(params,params.test_in_dataset,params.test_out_dataset,training=False)
 
                 (test_raw_enc_in_batch,test_enc_in_batch,test_enc_in_batch_len,
                  test_raw_dec_in_batch,test_dec_in_batch,test_dec_in_batch_len,
