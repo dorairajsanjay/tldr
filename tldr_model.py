@@ -255,7 +255,7 @@ def create_decoder_cell(params,mode):
             # extend to support beam search
             encoder_outputs_final = tf.transpose(params.encoder_outputs, [1, 0, 2])
             encoder_outputs_final = tf.contrib.seq2seq.tile_batch(
-                                        encoder_outputs, multiplier=params.beam_width)
+                                        encoder_outputs_final, multiplier=params.beam_width)
             
             encoder_state_final = tf.contrib.seq2seq.tile_batch(
                                         params.encoder_state, multiplier=params.beam_width)
@@ -271,6 +271,7 @@ def create_decoder_cell(params,mode):
     # create attention mechanism
     print("debug 1:",params.hidden_units,encoder_outputs_final,memory_sequence_length)
     
+    print(memory_sequence_length,encoder_outputs_final)
     train_attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
       num_units=params.hidden_units, 
       memory = encoder_outputs_final,
@@ -404,11 +405,7 @@ def create_model(params):
                                                       decoder_emb,
                                                       start_tokens=start_tokens,
                                                       end_token=params.sentence_end_index)
-
-            # Decoder
-            #initial_state = test_decoder_cell.zero_state(params.batch_size, params.dtype).clone(
-            #                                                          cell_state=decoder_initial_state)
-            
+                                              cell_state=decoder_initial_state)
             
             test_decoder = tf.contrib.seq2seq.BasicDecoder(
                                     cell = test_decoder_cell, 
@@ -435,16 +432,6 @@ def create_model(params):
             # and https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/seq2seq/python/kernel_tests/beam_search_decoder_test.py
             # and https://github.com/tensorflow/tensorflow/issues/13154 (Note that alignment history was disabled since it was not supported in BeamSearchDecoder
             
-            #params.test_decoder_cell = params.train_decoder_cell_attn
-            
-            #initial_state = params.train_decoder_cell_attn.zero_state(params.batch_size,params.dtype)
-            #initial_state = tf.contrib.seq2seq.tile_batch(initial_state,multiplier=params.beam_width)    
-            
-            #cell_state = params.test_decoder_cell.zero_state(params.batch_size * params.beam_width,params.dtype)
-            #cell_state = cell_state.clone(cell_state=initial_state)
-            
-            # add projection layer
-            #params.test_decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(params.test_decoder_cell,params.final_vocab_size) 
             
             test_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
                 cell = test_decoder_cell,
@@ -462,15 +449,8 @@ def create_model(params):
                                                                         maximum_iterations=params.max_summary_length,
                                                                         output_time_major = True)
             
-            #params.test_predictions = params.test_output_states.sample_id
-            
             # get predictions
             params.test_predictions  = test_output_states
-            #params.test_predictions = tf.identity(summaries[0])
-            
-            # convert to [batch_size,beam_width,time] format
-            #params.test_predictions = tf.cast(params.test_predictions, tf.int32)
-            #params.test_predictions = tf.transpose(params.test_predictions, [1, 2, 0])
 
     # Loss
 
