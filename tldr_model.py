@@ -505,6 +505,9 @@ def train_loop(params):
             
         # restore/backup from/to existing checkpoints
         print("Checkpoint path:%s" % params.ckpt_path)
+        
+        # check to see if model directory exists, else create it
+        os.makedirs(params.ckpt_dir,exist_ok=True)
             
         # restore model if exists
         if params.ignore_checkpoint != True:

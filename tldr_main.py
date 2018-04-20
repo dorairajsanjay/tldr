@@ -44,7 +44,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate",type=float,default=0.001,help="learning rate")
     parser.add_argument("--keep_prob",type=float,default=0.8,help="keep probability. this is (1 - the drop-out probability)")
 
-    parser.add_argument("--model_dir",default="./models",help="path to saved models")
+    parser.add_argument("--model_dir",default="./models_gs",help="path to saved models")
     parser.add_argument("--ignore_checkpoint", action='store_true',help="ignore existing checkpoints for restore")
 
     parser.add_argument("--data_dir",default="./data",help="path to data")
@@ -120,6 +120,10 @@ if __name__ == "__main__":
     
     # display params
     print(params_str)
+    
+    # update model path
+    params.ckpt_path = params.model_dir + "/model.ckpt"
+    params.ckpt_dir  = params.model_dir
     
     # write params to file
     print("Writing model params to :",params.params_file)
