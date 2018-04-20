@@ -193,6 +193,7 @@ def display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_
         dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds)
     
 def dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds):
+
     
     if len(test_raw_dec_in_batch) != len(test_preds):
         print("Reference/Hypothesis count mismatch.len(test_raw_dec_in_batch):%d, len(test_preds):%d" % (len(test_raw_dec_in_batch),len(test_preds)))
@@ -213,6 +214,9 @@ def dump_data_for_rouge_score(params,test_raw_dec_in_batch,test_preds):
         
         hyp_file.write(hypothesis + "\n")
         ref_file.write(reference + "\n")
+        
+        #print("hypothesis:",hypothesis)
+        #print("reference:",reference)
         
     hyp_file.close()
     ref_file.close()
@@ -586,8 +590,12 @@ def train_loop(params):
                 _, loss_value, summary, train_preds = sess.run([params.update_step, params.train_loss, merged_summary_op,params.train_predictions], feed_dict=feed_dict_train)
                 
                 # focus on just the first batch for now
-                params.test_batch_index = 0
+            
                 test_batch = batch_helper.getNextBatch(params,params.test_in_dataset,params.test_out_dataset,training=False)
+                #if test_batch == None:
+                #    # loop around
+                #    params.test_batch_index  = 0
+                #    test_batch = batch_helper.getNextBatch(params,params.test_in_dataset,params.test_out_dataset,training=False)
 
                 (test_raw_enc_in_batch,test_enc_in_batch,test_enc_in_batch_len,
                  test_raw_dec_in_batch,test_dec_in_batch,test_dec_in_batch_len,

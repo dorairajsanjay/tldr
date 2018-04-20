@@ -110,9 +110,9 @@ def getNextBatch(params,story_dataset,summary_dataset,training=True):
             return None
     else:
         if params.test_batch_index + params.batch_size > len(summary_dataset):
-            print("About to return None for test_batch. test_batch_index:%d,params.batch_size:%d,len(summary_dataset:%d)"
-                 % (params.test_batch_index,params.batch_size,len(summary_dataset)))
-            return None
+            #print("About to return None for test_batch. test_batch_index:%d,params.batch_size:%d,len(summary_dataset:%d)"
+            #     % (params.test_batch_index,params.batch_size,len(summary_dataset)))
+            params.test_batch_index = 0
             
     # get encoder input
     raw_enc_in,enc_in,enc_in_lengths, = getBatch(params,params.encoder_max_time,story_dataset,params.story_dicts[0],"encoder_input",training=training)
