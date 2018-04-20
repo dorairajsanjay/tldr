@@ -130,7 +130,7 @@ if __name__ == "__main__":
     params.ckpt_path = params.model_dir + "/model.ckpt"
     params.ckpt_dir  = params.model_dir
     
-    params.log_path = parms.log_dir
+    params.log_path = params.log_dir
     
     # write params to file
     print("Writing model params to :",params.params_file)
