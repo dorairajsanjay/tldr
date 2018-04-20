@@ -36,6 +36,8 @@ if __name__ == "__main__":
     # processing input arguments
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--gpu_id",type=int,default=0,help="gpu id [0...max]")
+    
     parser.add_argument("--batch_size",type=int,default=64,help="batch size")
     parser.add_argument("--vocab_size",type=int,default=40000,help="vocabulary size to generate when generating the full dataset")
     parser.add_argument("--hidden_units",type=int,default=128,help="number of LSTM hidden units")
@@ -80,6 +82,7 @@ if __name__ == "__main__":
     params_str = ""
     
     params_str += ("\nTraining properties:")
+    params_str += "\ngpu id                 :%d"    % (args.gpu_id); params.gpu_id = args.gpu_id
     params_str += "\nbatch size             :%d"    % (args.batch_size); params.batch_size = args.batch_size
     params_str += ("\nvocab size             :%d"    % args.vocab_size); params.vocab_size = args.vocab_size    
     params_str += ("\nhidden units           :%d"    % args.hidden_units); params.hidden_units = args.hidden_units

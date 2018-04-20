@@ -497,18 +497,20 @@ def train_loop(params):
 
     # saver for checkpointing model
     saver = tf.train.Saver(max_to_keep=4)
+    
+    config = tf.ConfigProto(device_count = {'GPU': params.gpu_id}) 
 
-    with tf.Session() as sess:
+    with tf.Session(config=config) as sess:
 
         # initialize global variables
         sess.run(tf.global_variables_initializer())
-            
+
         # restore/backup from/to existing checkpoints
         print("Checkpoint path:%s" % params.ckpt_path)
-        
+
         # check to see if model directory exists, else create it
         os.makedirs(params.ckpt_dir,exist_ok=True)
-            
+
         # restore model if exists
         if params.ignore_checkpoint != True:
             try:
@@ -564,7 +566,7 @@ def train_loop(params):
 
                 # training
                 _, loss_value, summary, train_preds = sess.run([params.update_step, params.train_loss, merged_summary_op,params.train_predictions], feed_dict=feed_dict_train)
-                
+
                 # focus on just the first batch for now
                 params.test_batch_index = 0
                 test_batch = batch_helper.getNextBatch(params,params.test_in_dataset,params.test_out_dataset,training=False)
@@ -572,33 +574,33 @@ def train_loop(params):
                 (test_raw_enc_in_batch,test_enc_in_batch,test_enc_in_batch_len,
                  test_raw_dec_in_batch,test_dec_in_batch,test_dec_in_batch_len,
                  test_raw_dec_out_batch,test_dec_out_batch,test_dec_out_batch_len) = test_batch
-                
+
                 #print("Completed training...proceeding to test...")
                 # feed inputs
                 feed_dict_test = {
                     params.encoder_inputs: test_enc_in_batch,
                     params.source_sequence_length: test_enc_in_batch_len
                 }
-                
+
                 #print("params.batch_size:",params.batch_size)
                 #print("test_enc_in_batch:",test_enc_in_batch)
                 #print("test_enc_in_batch_len:",test_enc_in_batch_len)
-                
+
                 # testing
                 test_preds = sess.run([params.test_predictions], feed_dict=feed_dict_test)
 
                 # increment batches_count and see if we need to display stats
                 batches_count += 1    
                 total_batches += 1
-                
+
                 # display stats and create checkpoint
                 if batches_count % params.batch_stats_display_count == 0:
-                    
+
                     if params.inference_style == "greedy_search":
                         display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds)
                     else:
                         display_stats2(params,train_batch,test_batch,epoch_index,batches_count,loss_value,train_preds,test_preds)
-                    
+
                     # Create checkpoint
                     if params.save_model == True:
                         print("Creating checkpoint in:",params.ckpt_path)
