@@ -71,7 +71,7 @@ def display_stats(params,train_batch,test_batch,epoch_index,batches_count,loss_v
         print("test_raw_enc_in_batch:\n",test_raw_enc_in_batch)
         sample_id = 0
 
-    #print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
+#print("len(test_raw_enc_in_batch[sample_id]):",len(test_raw_enc_in_batch[sample_id]))
     print("\nTest. Story       :"," ".join(test_raw_enc_in_batch[sample_id][:
                         params.max_display_len if len(test_raw_enc_in_batch[sample_id]) > params.max_display_len else len(test_raw_enc_in_batch[sample_id])]))
     print("Test. Original Summary:", " ".join(test_raw_dec_in_batch[sample_id][:params.max_display_len if len(test_raw_dec_in_batch[sample_id])>params.max_display_len else len(test_raw_dec_in_batch[sample_id])]))  
@@ -413,6 +413,9 @@ def create_model(params):
                            name='start_tokens')
         
         if params.inference_style == "greedy_search":
+
+			# fudge for test_decoder_cell to be equal to train_decoder_cell to get the attention values
+            test_decoder_cell = train_decoder_cell
             
             test_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
                                                       decoder_emb,
