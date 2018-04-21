@@ -1,3 +1,6 @@
+out*
+mb2/
+log*/
 *.pkl
 *.in
 *.out
