@@ -112,6 +112,8 @@ class ModelParams(object):
     train_predictions = None
     test_predictions = None
     
+    training = None
+    
     # initialize the text selector object
     lts = lm_text_selector.LMTextSelector()
 

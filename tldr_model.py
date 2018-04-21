@@ -236,7 +236,9 @@ def initialize_data(params):
         print("Restoring train and test datasets")
         utils.restore_train_and_test_datasets(params)
         
-def create_decoder_cell(params,mode):
+def create_decoder_cell(params,decoder_cell,mode):
+    
+    print("create_decoder_cell:decoder_cell:",decoder_cell)
     
     encoder_outputs_final = tf.transpose(params.encoder_outputs, [1, 0, 2])
     memory_sequence_length = params.source_sequence_length
@@ -247,26 +249,27 @@ def create_decoder_cell(params,mode):
     if mode == "inference":
         
         print("create decoder cell: inference")
-            
+        
         if params.inference_style == "beam_search":
-           
+
             print("create_decoder_cell: beam_search and mode: inference")
             
+            # set alignment to False for beam search with attention
+            alignment_history = False
+
             # extend to support beam search
             encoder_outputs_final = tf.transpose(params.encoder_outputs, [1, 0, 2])
             encoder_outputs_final = tf.contrib.seq2seq.tile_batch(
                                         encoder_outputs_final, multiplier=params.beam_width)
-            
+
             encoder_state_final = tf.contrib.seq2seq.tile_batch(
                                         params.encoder_state, multiplier=params.beam_width)
             memory_sequence_length = tf.contrib.seq2seq.tile_batch(
                                         params.source_sequence_length, multiplier=params.beam_width)
-            
+
             # scale up batch_size beam_width times
             batch_size_final = params.batch_size * params.beam_width
-            
-            # set alignment to False for beam search with attention
-            alignment_history = False
+
     
     # create attention mechanism
     print("debug 1:",params.hidden_units,encoder_outputs_final,memory_sequence_length)
@@ -277,10 +280,7 @@ def create_decoder_cell(params,mode):
       memory = encoder_outputs_final,
       memory_sequence_length=memory_sequence_length,
       normalize = True)
-
-    # basic LSTM decoder cell
-    decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units)
-
+    
     # create attention wrapper around decoder cell
     decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
                                                 decoder_cell , 
@@ -290,10 +290,12 @@ def create_decoder_cell(params,mode):
 
     # add projection layer
     decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(decoder_cell,params.final_vocab_size)
-
+    
     # determine initial decoder state
-    decoder_initial_state = decoder_cell.zero_state(batch_size_final, params.dtype).clone(
-                                                                      cell_state=encoder_state_final)
+    print("batch_size_final:",batch_size_final)
+    print(decoder_cell,params.dtype)
+    decoder_initial_state = decoder_cell.zero_state(batch_size_final, params.dtype)
+    decoder_initial_state = decoder_initial_state.clone(cell_state=encoder_state_final)
 
     return decoder_cell,decoder_initial_state,
 
@@ -302,6 +304,9 @@ def create_model(params):
 
     # create default graph
     tf.reset_default_graph()
+    
+    # Embedding
+    params.emb_init = tf.truncated_normal_initializer(mean=0.0, stddev=0.01)
 
     with tf.name_scope("Inputs"):
 
@@ -310,22 +315,23 @@ def create_model(params):
         params.decoder_inputs = tf.placeholder(tf.int32,[None,None],name="decoder_inputs")
         params.decoder_targets = tf.placeholder(tf.int32,[None,None],name="decoder_targets")
 
-        params.source_sequence_length = tf.placeholder(tf.int32,shape=[params.batch_size])
-        params.target_sequence_length = tf.placeholder(tf.int32,shape=[params.batch_size])
+        params.source_sequence_length = tf.placeholder(tf.int32,shape=[None])
+        params.target_sequence_length = tf.placeholder(tf.int32,shape=[None])
 
         params.tf_batch_size = tf.size(params.source_sequence_length)
-    
-    # Embedding
-    params.emb_init = tf.truncated_normal_initializer(mean=0.0, stddev=0.01)
+        
+    with tf.variable_scope('encoder_embeddings',reuse=tf.AUTO_REUSE):
+            params.encoder_emb = tf.get_variable(
+                "embedding_encoder", [params.final_vocab_size, params.embedding_size],
+                initializer=params.emb_init)
 
     # Encoder
-    with tf.variable_scope('encoder_lstm_cell',reuse=tf.AUTO_REUSE):
+    with tf.variable_scope('encoder',reuse=tf.AUTO_REUSE):
+       
 
-        params.encoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="encoder_lstm_cell")
+        params.encoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units)
         params.encoder_cell = tf.nn.rnn_cell.DropoutWrapper(params.encoder_cell,
                                                         output_keep_prob=params.keep_prob)
-
-        params.encoder_emb = tf.get_variable("embedding_encoder",[params.final_vocab_size, params.embedding_size], initializer=params.emb_init)
 
         params.encoder_emb_inp = tf.nn.embedding_lookup(params.encoder_emb, params.encoder_inputs)
 
@@ -360,8 +366,14 @@ def create_model(params):
         # embedding lookup
         decoder_emb_inp = tf.nn.embedding_lookup(decoder_emb, params.decoder_inputs)
         
+        # basic LSTM decoder cell
+        with tf.variable_scope("decoder_cell",reuse=tf.AUTO_REUSE):
+            decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units)
+        
+        print("create_model:decoder_cell:",decoder_cell)
+        
         ## CALL create_decoder_cell here
-        train_decoder_cell,decoder_initial_state = create_decoder_cell(params,"training")
+        train_decoder_cell,train_decoder_initial_state = create_decoder_cell(params,decoder_cell,mode="training")
 
         # Helper
         train_helper = tf.contrib.seq2seq.TrainingHelper(
@@ -373,7 +385,7 @@ def create_model(params):
         train_decoder = tf.contrib.seq2seq.BasicDecoder(
                                 cell = train_decoder_cell, 
                                 helper = train_helper, 
-                                initial_state = decoder_initial_state)
+                                initial_state = train_decoder_initial_state)
 
         # Dynamic decoding
         train_output_states,train_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
@@ -390,8 +402,8 @@ def create_model(params):
         ##### ##### ##### ##### ##### 
         
         ## CALL create_decoder_cell here
-        test_decoder_cell,decoder_initial_state = create_decoder_cell(params,"inference")
-        test_decoder_cell = train_decoder_cell
+        test_decoder_cell,test_decoder_initial_state = create_decoder_cell(params,decoder_cell,mode="inference")
+        #test_decoder_cell = train_decoder_cell
         
         # start tokens
         #start_tokens=tf.fill([params.batch_size], params.sentence_start_index),
@@ -410,7 +422,7 @@ def create_model(params):
             test_decoder = tf.contrib.seq2seq.BasicDecoder(
                                     cell = test_decoder_cell, 
                                     helper = test_helper, 
-                                    initial_state = decoder_initial_state)
+                                    initial_state = test_decoder_initial_state)
 
             # Dynamic decoding
             test_output_states,test_final_context_state,_ = tf.contrib.seq2seq.dynamic_decode(
@@ -437,7 +449,7 @@ def create_model(params):
                 embedding = decoder_emb,
                 start_tokens = start_tokens,
                 end_token = params.sentence_end_index,
-                initial_state = decoder_initial_state,
+                initial_state = test_decoder_initial_state,
                 beam_width = params.beam_width,
                 length_penalty_weight = 0.0)
             
