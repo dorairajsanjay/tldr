@@ -391,6 +391,7 @@ def create_model(params):
         
         ## CALL create_decoder_cell here
         test_decoder_cell,decoder_initial_state = create_decoder_cell(params,"inference")
+        test_decoder_cell = train_decoder_cell
         
         # start tokens
         #start_tokens=tf.fill([params.batch_size], params.sentence_start_index),
@@ -419,8 +420,7 @@ def create_model(params):
             # logits = [batch x seq_len x decoder_vocabulary_size]
             test_logits = test_output_states.rnn_output
 
-            # predictions = [batch x seq_len]
-            #params.test_predictions = tf.identity(params.test_output_states.sample_id)
+            # return argmax of softmax 
             params.test_predictions = test_output_states.sample_id
             
         elif params.inference_style == "beam_search":
