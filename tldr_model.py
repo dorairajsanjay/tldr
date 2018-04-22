@@ -279,14 +279,16 @@ def create_decoder_cell(params,decoder_cell,mode):
       num_units=params.hidden_units, 
       memory = encoder_outputs_final,
       memory_sequence_length=memory_sequence_length,
-      normalize = True)
+      normalize = True,
+      name="attention")
     
     # create attention wrapper around decoder cell
     decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
                                                 decoder_cell , 
                                                 train_attention_mechanism, 
                                                 alignment_history=alignment_history,
-                                                attention_layer_size=params.hidden_units)
+                                                attention_layer_size=params.hidden_units,
+												name="attention_wrapper")
 
     # add projection layer
     decoder_cell = tf.contrib.rnn.OutputProjectionWrapper(decoder_cell,params.final_vocab_size)
@@ -311,12 +313,12 @@ def create_model(params):
     with tf.name_scope("Inputs"):
 
         # shape of input is [max_time,batch_size] - time_major
-        params.encoder_inputs = tf.placeholder(tf.int32,[None,None],name="encoder_inputs")
-        params.decoder_inputs = tf.placeholder(tf.int32,[None,None],name="decoder_inputs")
-        params.decoder_targets = tf.placeholder(tf.int32,[None,None],name="decoder_targets")
+        params.encoder_inputs = tf.placeholder(tf.int32,[None,params.batch_size],name="encoder_inputs")
+        params.decoder_inputs = tf.placeholder(tf.int32,[None,params.batch_size],name="decoder_inputs")
+        params.decoder_targets = tf.placeholder(tf.int32,[None,params.batch_size],name="decoder_targets")
 
-        params.source_sequence_length = tf.placeholder(tf.int32,shape=[None])
-        params.target_sequence_length = tf.placeholder(tf.int32,shape=[None])
+        params.source_sequence_length = tf.placeholder(tf.int32,shape=[params.batch_size])
+        params.target_sequence_length = tf.placeholder(tf.int32,shape=[params.batch_size])
 
         params.tf_batch_size = tf.size(params.source_sequence_length)
         
@@ -329,7 +331,8 @@ def create_model(params):
     with tf.variable_scope('encoder',reuse=tf.AUTO_REUSE):
        
 
-        params.encoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units)
+        params.encoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="encoder_cell")
+        #params.encoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units)
         params.encoder_cell = tf.nn.rnn_cell.DropoutWrapper(params.encoder_cell,
                                                         output_keep_prob=params.keep_prob)
 
@@ -367,8 +370,7 @@ def create_model(params):
         decoder_emb_inp = tf.nn.embedding_lookup(decoder_emb, params.decoder_inputs)
         
         # basic LSTM decoder cell
-        with tf.variable_scope("decoder_cell",reuse=tf.AUTO_REUSE):
-            decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units)
+        decoder_cell = tf.contrib.rnn.BasicLSTMCell(params.hidden_units,name="decoder_cell")
         
         print("create_model:decoder_cell:",decoder_cell)
         
@@ -401,9 +403,19 @@ def create_model(params):
         ##### Inference decoder ######
         ##### ##### ##### ##### ##### 
         
-        ## CALL create_decoder_cell here
-        test_decoder_cell,test_decoder_initial_state = create_decoder_cell(params,decoder_cell,mode="inference")
-        #test_decoder_cell = train_decoder_cell
+
+        decoder_initial_state = None
+        if params.inference_style == "greedy_search":
+            
+            # this is a hack till I can figure out why Beamsearch does not work well with Attention
+            test_decoder_cell = train_decoder_cell
+            test_decoder_initial_state = test_decoder_cell.zero_state(params.batch_size, params.dtype)
+            test_decoder_initial_state = test_decoder_initial_state.clone(cell_state=params.encoder_state)
+            
+        elif params.inference_style == "beam_search":
+            
+            ## CALL create_decoder_cell here
+            test_decoder_cell,test_decoder_initial_state = create_decoder_cell(params,decoder_cell,mode="inference")
         
         # start tokens
         #start_tokens=tf.fill([params.batch_size], params.sentence_start_index),
@@ -464,31 +476,33 @@ def create_model(params):
             params.test_predictions  = test_output_states
 
     # Loss
+    
+    with tf.variable_scope('loss',reuse=tf.AUTO_REUSE):
 
-    #_target_sequence_length = [100]*128
-    weights = tf.sequence_mask(params.target_sequence_length, dtype=tf.float32)
+        #_target_sequence_length = [100]*128
+        weights = tf.sequence_mask(params.target_sequence_length, dtype=tf.float32)
 
-    sequence_loss = tf.contrib.seq2seq.sequence_loss(
-                                    train_logits,
-                                    params.decoder_targets,
-                                    weights,
-                                    average_across_timesteps=False,
-                                    average_across_batch=False)
+        sequence_loss = tf.contrib.seq2seq.sequence_loss(
+                                        train_logits,
+                                        params.decoder_targets,
+                                        weights,
+                                        average_across_timesteps=False,
+                                        average_across_batch=False)
 
-    # I might have to divide by batch size to make the loss invariant to batch size 
-    # See https://www.tensorflow.org/tutorials/seq2seq
-    params.train_loss = tf.reduce_mean(sequence_loss)
+        # I might have to divide by batch size to make the loss invariant to batch size 
+        # See https://www.tensorflow.org/tutorials/seq2seq
+        params.train_loss = tf.reduce_mean(sequence_loss)
 
-    # Gradient computation and optimization
-    # gradient computation
-    tf_params = tf.trainable_variables()
-    gradients = tf.gradients(params.train_loss,tf_params)
-    clipped_gradients,_ = tf.clip_by_global_norm(gradients,params.max_grad_norm)
+        # Gradient computation and optimization
+        # gradient computation
+        tf_params = tf.trainable_variables()
+        gradients = tf.gradients(params.train_loss,tf_params)
+        clipped_gradients,_ = tf.clip_by_global_norm(gradients,params.max_grad_norm)
 
-    # optimizer
-    optimizer = tf.train.AdamOptimizer(params.learning_rate)
+        # optimizer
+        optimizer = tf.train.AdamOptimizer(params.learning_rate)
 
-    params.update_step = optimizer.apply_gradients(zip(clipped_gradients,tf_params))
+        params.update_step = optimizer.apply_gradients(zip(clipped_gradients,tf_params))
 
     
 def train_loop(params):
